@@ -1,0 +1,38 @@
+digraph architecture {
+graph [bgcolor="#fffefd",pad="0.25",nodesep="0.35",ranksep="0.5",fontname="Arial"];
+node [shape=box,style="rounded,filled",fillcolor="#f2edf6",color="#b5a0c0",fontname="Arial",fontsize=12,margin="0.16,0.12",fontcolor="#302536"];
+edge [fontname="Arial",fontsize=10,color="#71507e",fontcolor="#65596b",arrowsize=0.7];
+rankdir=TB;
+ bank [label="Rotating bank: default 1
+Member queue: use each question once
+10 questions per issue maximum"];
+ scheduled [label="scheduled
+Freeze questions + reminder policy
+Consume included member questions"];
+ open [label="open
+Opening email enters outbox"];
+ reminder [label="Due reminder slot
+Queue only unsubmitted members"];
+ closing [label="closing
+Deadline passed; edits rejected"];
+ published [label="published
+Snapshot + publication outbox in one batch"];
+ skipped [label="skipped
+No eligible submitted updates"];
+ cancelled [label="cancelled
+Host cancellation or deleted group"];
+ questions [label="Question reminder
+Default: 24 hours before answer window
+Skip members with a queued question"];
+ bank -> questions [label="Before questions close"];
+ questions -> bank [label="Member adds a question"];
+ bank -> scheduled [label="Planner: within 7 days of delivery"];
+ scheduled -> open [label="Opening time"];
+ open -> reminder -> open [label="Next slot"];
+ scheduled -> closing [label="Deadline reached"];
+ open -> closing [label="Deadline reached"];
+ closing -> published [label="At least one eligible update"];
+ closing -> skipped [label="No eligible updates"];
+ scheduled -> cancelled; open -> cancelled;
+ 
+}

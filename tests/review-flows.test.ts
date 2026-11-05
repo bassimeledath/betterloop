@@ -199,7 +199,7 @@ it("R3: a group with no selected questions must not starve another group's recur
     second = await h.group(owner),
     stamp = Date.now();
   await h.db
-    .prepare("UPDATE questions SET selected=0 WHERE group_id=?")
+    .prepare("UPDATE groups SET bank_question_count=0 WHERE id=?")
     .bind(first)
     .run();
   await h.db

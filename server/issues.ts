@@ -4,6 +4,7 @@ import type { App, Issue, Contribution, Update } from "./types";
 import { id, now, member, fail, audit } from "./security";
 import { offsets, reminderTime } from "./reminders";
 import { redactPublication } from "./privacy";
+import { selectQuestions, snapshotQuestions } from "./question-selection";
 export const issues = new Hono<App>();
 export const emptyUpdate: Update = {
   answers: {},
@@ -130,20 +131,12 @@ issues.post("/:groupId/issues", async (c) => {
     if (created) return c.json({ id: created.id });
     fail(409, "Finish or cancel the current issue before starting another.");
   }
-  const qs = (
-    await c.env.DB.prepare(
-      "SELECT q.text,q.position,q.author_id,u.name AS author_name FROM questions q LEFT JOIN users u ON u.id=q.author_id WHERE group_id=? AND selected=1 ORDER BY q.position,q.created_at LIMIT 10",
-    )
-      .bind(gid)
-      .all<{
-        text: string;
-        position: number;
-        author_id: string | null;
-        author_name: string;
-      }>()
-  ).results;
+  const qs = await selectQuestions(c.env, gid);
   if (!qs.length)
-    fail(400, "Choose at least one question before opening an issue.");
+    fail(
+      400,
+      "Enable a bank question or add a member question before opening an issue.",
+    );
   const policy = await c.env.DB.prepare(
     "SELECT reminder_offsets_json FROM groups WHERE id=?",
   )
@@ -164,22 +157,10 @@ issues.post("/:groupId/issues", async (c) => {
       reminderTime(b.deliveryAt, offsets(policy?.reminder_offsets_json)[0]),
       stamp,
       creationKey,
-      policy?.reminder_offsets_json || "[48]",
+      policy?.reminder_offsets_json || "[24]",
       gid,
     ),
-    ...qs.map((q, j) =>
-      c.env.DB.prepare(
-        "INSERT INTO issue_questions(id,issue_id,group_id,text,author_name,position,author_id) SELECT ?,id,?,?,?,?,? FROM issues WHERE id=?",
-      ).bind(
-        id(),
-        gid,
-        q.text,
-        q.author_name || "The group",
-        j,
-        q.author_id || null,
-        iid,
-      ),
-    ),
+    ...snapshotQuestions(c.env, gid, iid, qs),
     c.env.DB.prepare(
       "INSERT INTO audit_events(id,actor_id,group_id,action,target,created_at) SELECT ?,?,group_id,'issue.opened',id,? FROM issues WHERE id=?",
     ).bind(id(), c.get("session").user.id, stamp, iid),

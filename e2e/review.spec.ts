@@ -601,3 +601,108 @@ test("host crops and replaces a group cover and previews an email with its inlin
     .click();
   await expect(page.getByText("Current cover removed.")).toBeVisible();
 });
+
+test("mobile hosts configure bank rotation, separate question emails and a downsized reminder image", async ({
+  page,
+  h,
+}) => {
+  const { gid } = await setup(page, h);
+  await page.goto(`/groups/${gid}/settings`);
+  await page
+    .getByLabel("Rotating questions from the bank", { exact: true })
+    .fill("2");
+  await page
+    .getByLabel("Question reminder hours before questions close", {
+      exact: true,
+    })
+    .fill("24");
+  await page
+    .getByRole("button", { name: "Save question settings", exact: true })
+    .click();
+  await expect(
+    page.getByText("Question settings saved for future issues."),
+  ).toBeVisible();
+  await page
+    .getByLabel("Remind me to add a question for the next issue", {
+      exact: true,
+    })
+    .uncheck();
+  await page
+    .getByRole("button", { name: "Save preferences", exact: true })
+    .click();
+  await expect(
+    page.getByText("Your inbox preferences are saved."),
+  ).toBeVisible();
+  const panel = page.locator("section").filter({
+    has: page.getByRole("heading", {
+      name: "Submission reminder image",
+      exact: true,
+    }),
+  });
+  await panel
+    .getByLabel("Choose a reminder image", { exact: true })
+    .setInputFiles(await photo(page, 3000, 2000, "image/png"));
+  await expect(panel.getByLabel("Cover crop preview")).toBeVisible();
+  await panel
+    .getByLabel("Cover description", { exact: true })
+    .fill("A friendly nudge from the gang");
+  await panel
+    .getByRole("button", { name: "Save reminder image", exact: true })
+    .click();
+  await expect(
+    page.getByText("Image saved for submission reminder emails."),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByLabel("Rotating questions from the bank", { exact: true }),
+  ).toHaveValue("2");
+  await expect(
+    page.getByLabel("Remind me to add a question for the next issue", {
+      exact: true,
+    }),
+  ).not.toBeChecked();
+  const image = panel.locator("img");
+  await expect
+    .poll(() =>
+      image.evaluate(
+        (i: HTMLImageElement) => i.complete && i.naturalWidth === 1200,
+      ),
+    )
+    .toBe(true);
+  expect(
+    await h.db
+      .prepare("SELECT cover_id,reminder_image_id FROM groups WHERE id=?")
+      .bind(gid)
+      .first(),
+  ).toMatchObject({ cover_id: null, reminder_image_id: expect.any(String) });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await mkdir(evidenceRoot, { recursive: true });
+  await panel.screenshot({ path: evidenceRoot + "/mobile-reminder-image.png" });
+  await page.goto(`/groups/${gid}/questions`);
+  await page
+    .getByLabel("Your question", { exact: true })
+    .fill("What is something we should celebrate?");
+  await page
+    .getByRole("button", { name: "Send to the question pile ✍️", exact: true })
+    .click();
+  await expect(
+    page.getByRole("checkbox", {
+      name: "Use What is something we should celebrate?",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("checkbox", {
+      name: "Use What is something we should celebrate?",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Each issue also includes 2 rotating bank questions/),
+  ).toBeVisible();
+});

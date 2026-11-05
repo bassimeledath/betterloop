@@ -75,7 +75,7 @@ groups.post("/", async (c) => {
   const delivery = nextDelivery(stamp, b.timezone, b.cadence, b.recurrence);
   const result = await c.env.DB.batch([
     c.env.DB.prepare(
-      `INSERT OR IGNORE INTO groups(id,name,description,owner_id,timezone,cadence,recurrence_json,next_delivery,created_at,creation_key) SELECT ?,?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM groups WHERE owner_id=? AND deleted_at IS NULL)<(SELECT group_allowance FROM users WHERE id=? AND deleted_at IS NULL) AND (SELECT COUNT(*) FROM groups WHERE deleted_at IS NULL)<5 RETURNING id`,
+      `INSERT OR IGNORE INTO groups(id,name,description,owner_id,timezone,cadence,recurrence_json,next_delivery,created_at,creation_key,reminder_offsets_json) SELECT ?,?,?,?,?,?,?,?,?,?,'[24]' WHERE (SELECT COUNT(*) FROM groups WHERE owner_id=? AND deleted_at IS NULL)<(SELECT group_allowance FROM users WHERE id=? AND deleted_at IS NULL) AND (SELECT COUNT(*) FROM groups WHERE deleted_at IS NULL)<5 RETURNING id`,
     ).bind(
       gid,
       b.name,
@@ -93,11 +93,6 @@ groups.post("/", async (c) => {
     c.env.DB.prepare(
       `INSERT INTO memberships(group_id,user_id,role,joined_at) SELECT id,?,'owner',? FROM groups WHERE id=? AND owner_id=?`,
     ).bind(user.id, stamp, gid, user.id),
-    ...seedQuestions.map((text, i) =>
-      c.env.DB.prepare(
-        "INSERT INTO questions(id,group_id,author_id,text,selected,position,created_at) SELECT ?,id,?,?,1,?,? FROM groups WHERE id=? AND owner_id=?",
-      ).bind(id(), user.id, text, i, stamp, gid, user.id),
-    ),
     c.env.DB.prepare(
       "INSERT INTO audit_events(id,actor_id,group_id,action,target,created_at) SELECT ?,?,id,'group.created',id,? FROM groups WHERE id=? AND owner_id=?",
     ).bind(id(), user.id, stamp, gid, user.id),
@@ -113,7 +108,7 @@ groups.get("/:groupId", async (c) => {
   const gid = c.req.param("groupId"),
     m = await member(c, gid);
   const g = await c.env.DB.prepare(
-    "SELECT g.*,(SELECT caption FROM group_covers WHERE id=g.cover_id) AS cover_caption,(SELECT COUNT(*) FROM questions q WHERE q.group_id=g.id AND q.selected=1) AS selected_questions FROM groups g WHERE g.id=?",
+    "SELECT g.*,(SELECT caption FROM group_covers WHERE id=g.cover_id) AS cover_caption,(SELECT caption FROM group_covers WHERE id=g.reminder_image_id) AS reminder_image_caption,(SELECT COUNT(*) FROM questions q WHERE q.group_id=g.id AND q.selected=1 AND q.used_issue_id IS NULL AND q.source='member') AS selected_questions FROM groups g WHERE g.id=?",
   )
     .bind(gid)
     .first<Group>();
@@ -236,7 +231,7 @@ groups.post("/:groupId/pause", async (c) => {
     );
     statements.push(
       c.env.DB.prepare(
-        "UPDATE email_outbox SET state='skipped',payload=NULL,error_code='group_paused',updated_at=? WHERE group_id=? AND kind IN ('opening','reminder') AND state='queued'",
+        "UPDATE email_outbox SET state='skipped',payload=NULL,error_code='group_paused',updated_at=? WHERE group_id=? AND kind IN ('opening','reminder','question_reminder') AND state='queued'",
       ).bind(stamp, gid),
     );
     if (b.current === "cancel")
@@ -259,11 +254,20 @@ groups.get("/:groupId/questions", async (c) => {
   const gid = c.req.param("groupId");
   await member(c, gid);
   const r = await c.env.DB.prepare(
-    "SELECT q.*,u.name AS author_name FROM questions q LEFT JOIN users u ON u.id=q.author_id WHERE group_id=? ORDER BY q.selected DESC,q.position,q.created_at",
+    "SELECT q.*,u.name AS author_name FROM questions q LEFT JOIN users u ON u.id=q.author_id WHERE group_id=? AND q.source='member' AND q.used_issue_id IS NULL ORDER BY q.selected DESC,q.position,q.created_at LIMIT 200",
   )
     .bind(gid)
     .all();
-  return c.json({ questions: r.results, starter: seedQuestions });
+  const { questionDeadline } = await import("./question-reminders");
+  const group = await c.env.DB.prepare("SELECT * FROM groups WHERE id=?")
+    .bind(gid)
+    .first<Group>();
+  return c.json({
+    questions: r.results,
+    starter: seedQuestions,
+    questionDeadline: await questionDeadline(group!),
+    bankCount: group!.bank_question_count,
+  });
 });
 groups.post("/:groupId/questions", async (c) => {
   const gid = c.req.param("groupId");
@@ -273,7 +277,7 @@ groups.post("/:groupId/questions", async (c) => {
     .parse(await c.req.json());
   const qid = id();
   const r = await c.env.DB.prepare(
-    "INSERT INTO questions(id,group_id,author_id,text,created_at) SELECT ?,?,?,?,? WHERE (SELECT COUNT(*) FROM questions WHERE group_id=?)<200 RETURNING id",
+    "INSERT INTO questions(id,group_id,author_id,text,created_at,selected) SELECT ?,?,?,?,?,1 WHERE (SELECT COUNT(*) FROM questions WHERE group_id=? AND source='member' AND used_issue_id IS NULL)<200 RETURNING id",
   )
     .bind(qid, gid, c.get("session").user.id, b.text, now(), gid)
     .first();
@@ -294,7 +298,7 @@ groups.patch("/:groupId/questions/:questionId", async (c) => {
     })
     .parse(await c.req.json());
   const r = await c.env.DB.prepare(
-    `UPDATE questions SET selected=?,position=? WHERE id=? AND group_id=? AND (?=0 OR selected=1 OR (SELECT COUNT(*) FROM questions WHERE group_id=? AND selected=1)<10) RETURNING id`,
+    `UPDATE questions SET selected=?,position=? WHERE id=? AND group_id=? AND used_issue_id IS NULL AND source='member' AND (?=0 OR selected=1 OR (SELECT COUNT(*) FROM questions WHERE group_id=? AND selected=1 AND used_issue_id IS NULL)<10) RETURNING id`,
   )
     .bind(
       +b.selected,
@@ -452,15 +456,17 @@ groups.patch("/:groupId/preferences", async (c) => {
       opening: z.boolean(),
       reminder: z.boolean(),
       publication: z.boolean(),
+      questions: z.boolean().optional(),
     })
     .parse(await c.req.json());
   await c.env.DB.prepare(
-    "UPDATE memberships SET notify_open=?,notify_reminder=?,notify_issue=? WHERE group_id=? AND user_id=?",
+    "UPDATE memberships SET notify_open=?,notify_reminder=?,notify_issue=?,notify_questions=COALESCE(?,notify_questions) WHERE group_id=? AND user_id=?",
   )
     .bind(
       +b.opening,
       +b.reminder,
       +b.publication,
+      b.questions === undefined ? null : +b.questions,
       gid,
       c.get("session").user.id,
     )
@@ -623,4 +629,21 @@ groups.patch("/:groupId/reminders", async (c) => {
     .bind(JSON.stringify(values), gid)
     .run();
   return c.json({ hours: values });
+});
+
+groups.patch("/:groupId/question-policy", async (c) => {
+  const gid = c.req.param("groupId");
+  await member(c, gid, ["owner", "admin"]);
+  const b = z
+    .object({
+      bankCount: z.number().int().min(0).max(5),
+      reminderHours: z.number().int().min(0).max(168),
+    })
+    .parse(await c.req.json());
+  await c.env.DB.prepare(
+    "UPDATE groups SET bank_question_count=?,question_reminder_hours=?,revision=revision+1 WHERE id=?",
+  )
+    .bind(b.bankCount, b.reminderHours, gid)
+    .run();
+  return c.json({ ok: true });
 });

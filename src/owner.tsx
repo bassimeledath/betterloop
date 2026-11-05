@@ -21,7 +21,11 @@ function ScheduleEditor({
     [zone, setZone] = useState(g.timezone),
     [rule, setRule] = useState(original),
     [reminders, setReminders] = useState(
-      (JSON.parse(g.reminder_offsets_json || "[48]") as number[]).join(", "),
+      (JSON.parse(g.reminder_offsets_json || "[24]") as number[]).join(", "),
+    ),
+    [bankCount, setBankCount] = useState(g.bank_question_count ?? 1),
+    [questionHours, setQuestionHours] = useState(
+      g.question_reminder_hours ?? 24,
     ),
     [preview, setPreview] = useState<number | null>(null),
     [error, setError] = useState(""),
@@ -203,6 +207,56 @@ function ScheduleEditor({
       >
         Save reminder timing
       </button>
+      <h2 className="panel-title">Questions for each issue</h2>
+      <label>
+        Rotating questions from the bank
+        <input
+          type="number"
+          min={0}
+          max={5}
+          value={bankCount}
+          onChange={(e) => setBankCount(+e.target.value)}
+        />
+      </label>
+      <p className="small">
+        One by default. Member questions fill the remaining places, up to ten
+        questions total. Used member questions do not carry forward. Extra
+        questions wait for a later issue.
+      </p>
+      <label>
+        Question reminder hours before questions close
+        <input
+          type="number"
+          min={0}
+          max={168}
+          value={questionHours}
+          onChange={(e) => setQuestionHours(+e.target.value)}
+        />
+      </label>
+      <p className="small">
+        Questions close seven days before delivery, when answers open. Use 24 to
+        remind members the day before; use 0 to turn this off. People who
+        already offered a question are skipped.
+      </p>
+      <button
+        type="button"
+        className="button secondary"
+        onClick={async () => {
+          try {
+            await api("/groups/" + g.id + "/question-policy", {
+              method: "PATCH",
+              body: { bankCount, reminderHours: questionHours },
+            });
+            await reload();
+            setMessage("Question settings saved for future issues.");
+            setError("");
+          } catch (e) {
+            setError((e as Error).message);
+          }
+        }}
+      >
+        Save question settings
+      </button>
     </form>
   );
 }
@@ -266,6 +320,7 @@ export function GroupSettingsScreen({ gid }: { gid: string }) {
           opening: f.has("opening"),
           reminder: f.has("reminder"),
           publication: f.has("publication"),
+          questions: f.has("questions"),
         },
       });
       setMessage("Your inbox preferences are saved.");
@@ -301,6 +356,11 @@ export function GroupSettingsScreen({ gid }: { gid: string }) {
         {[
           ["opening", "Let me know when an issue opens", m.notify_open],
           ["reminder", "Remind me before the deadline", m.notify_reminder],
+          [
+            "questions",
+            "Remind me to add a question for the next issue",
+            m.notify_questions ?? 1,
+          ],
           ["publication", "Email me the finished letter", m.notify_issue],
         ].map(([name, text, value]) => (
           <label className="checkbox" key={String(name)}>
@@ -317,18 +377,12 @@ export function GroupSettingsScreen({ gid }: { gid: string }) {
       {host && (
         <>
           <CoverEditor group={data.group} reload={refresh} />
-          <ScheduleEditor
-            key={data.group.revision}
-            data={data}
-            reload={async () => {
-              const d = await refresh();
-              if (d)
-                setMessage(
-                  "Future schedule saved. Any open issue keeps its current deadline.",
-                );
-              return d;
-            }}
+          <CoverEditor
+            group={data.group}
+            reload={refresh}
+            purpose="reminder-image"
           />
+          <ScheduleEditor data={data} reload={refresh} />
           {active && <EmailPreview gid={gid} iid={active.id} />}
           {active && (
             <form className="panel" onSubmit={extend}>

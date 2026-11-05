@@ -1,0 +1,37 @@
+digraph architecture {
+graph [bgcolor="#fffefd",pad="0.25",nodesep="0.35",ranksep="0.5",fontname="Arial"];
+node [shape=box,style="rounded,filled",fillcolor="#f2edf6",color="#b5a0c0",fontname="Arial",fontsize=12,margin="0.16,0.12",fontcolor="#302536"];
+edge [fontname="Arial",fontsize=10,color="#71507e",fontcolor="#65596b",arrowsize=0.7];
+rankdir=TB;
+ edit [label="Edit answers, captions
+and uploaded photo references"];
+ local [label="Local recovery copy
+Same account + group + issue"];
+ save [label="Autosave after 1 second
+PUT contribution + revision"];
+ db [label="D1 draft_json
+Advance revision
+Resume this saved draft later"];
+ submit [label="Submit / Submit changes
+POST submit + saved revision"];
+ submitted [label="D1 submitted_json
+Copy of saved draft"];
+ publication [label="After deadline
+Publication uses submitted copy"];
+ conflict [label="Different remote revision
+Keep text; copy or reload"];
+ lost [label="Lost save response
+Read remote revision and content
+Matching content: acknowledge
+Unchanged revision: retry
+Different content: keep conflict"];
+ note [label="Later edits remain private.
+Submit changes replaces
+the submitted copy.",shape=note];
+ edit -> local; edit -> save;
+ save -> db [label="Saved"]; save -> conflict [label="Conflict"];
+ save -> lost [label="Unknown result"];
+ db -> submit -> submitted -> publication;
+ submitted -> note [style=dashed,arrowhead=none];
+ 
+}

@@ -2,6 +2,7 @@ import type { Env, Group, Issue, Publication, Update } from "./types";
 import { id, now } from "./security";
 import { reminderTime, offsets } from "./reminders";
 import type { Recurrence } from "../shared/schedule";
+import { selectQuestions, snapshotQuestions } from "./question-selection";
 export async function catchUpDelivery(
   previous: number,
   stamp: number,
@@ -77,7 +78,7 @@ export async function enqueueIssueMail(
 }
 async function plan(env: Env, stamp: number) {
   const g = await env.DB.prepare(
-    "SELECT * FROM groups g WHERE paused=0 AND deleted_at IS NULL AND next_delivery<=? AND EXISTS(SELECT 1 FROM questions q WHERE q.group_id=g.id AND q.selected=1) AND NOT EXISTS(SELECT 1 FROM issues i WHERE i.group_id=g.id AND i.state IN ('scheduled','open','closing')) ORDER BY next_delivery LIMIT 1",
+    "SELECT * FROM groups g WHERE paused=0 AND deleted_at IS NULL AND next_delivery<=? AND (g.bank_question_count>0 OR EXISTS(SELECT 1 FROM questions q WHERE q.group_id=g.id AND q.selected=1 AND q.used_issue_id IS NULL AND q.source='member' AND EXISTS(SELECT 1 FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.group_id=g.id AND m.user_id=q.author_id AND m.active=1 AND u.deleted_at IS NULL))) AND NOT EXISTS(SELECT 1 FROM issues i WHERE i.group_id=g.id AND i.state IN ('scheduled','open','closing')) ORDER BY next_delivery LIMIT 1",
   )
     .bind(stamp + 7 * 86400000)
     .first<Group>();
@@ -98,14 +99,15 @@ async function plan(env: Env, stamp: number) {
       .run();
     return;
   }
-  const qs = (
+  const qs = await selectQuestions(env, g.id, delivery - 7 * 86400000);
+  if (!qs.length) {
     await env.DB.prepare(
-      "SELECT q.text,q.author_id,u.name AS author_name FROM questions q LEFT JOIN users u ON u.id=q.author_id WHERE q.group_id=? AND q.selected=1 ORDER BY q.position,q.created_at LIMIT 10",
+      "UPDATE groups SET next_delivery=? WHERE id=? AND next_delivery=?",
     )
-      .bind(g.id)
-      .all<{ text: string; author_id: string | null; author_name: string }>()
-  ).results;
-  if (!qs.length) return;
+      .bind(future, g.id, g.next_delivery)
+      .run();
+    return;
+  }
   const iid = id();
   const title =
     new Intl.DateTimeFormat("en-US", {
@@ -125,24 +127,12 @@ async function plan(env: Env, stamp: number) {
       delivery,
       reminderTime(delivery, offsets(g.reminder_offsets_json)[0]),
       stamp,
-      g.reminder_offsets_json || "[48]",
+      g.reminder_offsets_json || "[24]",
       g.id,
       g.next_delivery,
       g.id,
     ),
-    ...qs.map((q, j) =>
-      env.DB.prepare(
-        "INSERT INTO issue_questions(id,issue_id,group_id,text,author_name,position,author_id) SELECT ?,id,?,?,?,?,? FROM issues WHERE id=?",
-      ).bind(
-        id(),
-        g.id,
-        q.text,
-        q.author_name || "The group",
-        j,
-        q.author_id || null,
-        iid,
-      ),
-    ),
+    ...snapshotQuestions(env, g.id, iid, qs),
     env.DB.prepare(
       "UPDATE groups SET next_delivery=? WHERE id=? AND next_delivery=? AND EXISTS(SELECT 1 FROM issues WHERE id=?)",
     ).bind(future, g.id, g.next_delivery, iid),

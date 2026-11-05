@@ -168,7 +168,7 @@ account.post("/email/confirm", async (c) => {
       "UPDATE login_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL AND EXISTS(SELECT 1 FROM email_changes WHERE token_hash=? AND claim_key=?)",
     ).bind(stamp, s.user.id, digest, claim),
     c.env.DB.prepare(
-      "UPDATE email_outbox SET recipient=? WHERE user_id=? AND state='queued' AND kind IN ('opening','reminder','publication') AND EXISTS(SELECT 1 FROM email_changes WHERE token_hash=? AND claim_key=?)",
+      "UPDATE email_outbox SET recipient=? WHERE user_id=? AND state='queued' AND kind IN ('opening','reminder','publication','question_reminder') AND EXISTS(SELECT 1 FROM email_changes WHERE token_hash=? AND claim_key=?)",
     ).bind(change.new_email, s.user.id, digest, claim),
   ]);
   if (!rs[0].results.length) fail(400, "This link was already used.");

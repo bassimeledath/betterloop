@@ -5,15 +5,22 @@ import type { Group } from "../shared/contracts";
 export function CoverEditor({
   group,
   reload,
+  purpose = "cover",
 }: {
   group: Group;
+  purpose?: "cover" | "reminder-image";
   reload: () => Promise<unknown>;
 }) {
+  const reminder = purpose === "reminder-image",
+    assetId = reminder ? group.reminder_image_id : group.cover_id,
+    assetCaption = reminder
+      ? group.reminder_image_caption
+      : group.cover_caption;
   const [image, setImage] = useState<ImageBitmap | null>(null),
     [zoom, setZoom] = useState(1),
     [x, setX] = useState(0),
     [y, setY] = useState(0),
-    [caption, setCaption] = useState(group.cover_caption || ""),
+    [caption, setCaption] = useState(assetCaption || ""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
@@ -71,10 +78,14 @@ export function CoverEditor({
       }
       if (!blob || blob.size > 196608)
         throw new Error("Try a simpler or smaller cover photo.");
-      await uploadCover("/groups/" + group.id + "/cover", blob, caption);
+      await uploadCover("/groups/" + group.id + "/" + purpose, blob, caption);
       setImage(null);
       await reload();
-      setMessage("Cover saved. It will appear in your next letter.");
+      setMessage(
+        reminder
+          ? "Image saved for submission reminder emails."
+          : "Cover saved. It will appear in your next letter.",
+      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -83,30 +94,32 @@ export function CoverEditor({
   }
   return (
     <section className="panel">
-      <h2 className="panel-title">Your group cover</h2>
+      <h2 className="panel-title">
+        {reminder ? "Submission reminder image" : "Your group cover"}
+      </h2>
       <p className="small">
-        Choose a wide group photo for the home card, web letter and newsletter
-        email. Replacement affects future letters; previously delivered copies
-        stay unchanged.
+        {reminder
+          ? "Choose an image for emails that remind people to submit their update. It is separate from your newsletter cover."
+          : "Choose a wide group photo for the home card, web letter and newsletter email. Replacement affects future letters; previously delivered copies stay unchanged."}
       </p>
       <ErrorMessage error={error} />
       {message && <p role="status">{message}</p>}
-      {group.cover_id && !image && (
+      {assetId && !image && (
         <figure>
           <img
             className="group-cover"
-            src={"/api/groups/" + group.id + "/covers/" + group.cover_id}
-            alt={group.cover_caption || group.name + " cover"}
+            src={"/api/groups/" + group.id + "/covers/" + assetId}
+            alt={assetCaption || group.name + " cover"}
           />
-          {group.cover_caption && (
-            <figcaption>{group.cover_caption}</figcaption>
-          )}
+          {assetCaption && <figcaption>{assetCaption}</figcaption>}
         </figure>
       )}
       <label>
-        Choose a group cover
+        {reminder ? "Choose a reminder image" : "Choose a group cover"}
         <input
-          aria-label="Choose a group cover"
+          aria-label={
+            reminder ? "Choose a reminder image" : "Choose a group cover"
+          }
           type="file"
           accept="image/jpeg,image/png,image/webp"
           disabled={busy}
@@ -169,7 +182,11 @@ export function CoverEditor({
           </label>
           <div className="stack">
             <Button onClick={() => void save()} disabled={busy}>
-              {busy ? "Saving cover…" : "Save group cover"}
+              {busy
+                ? "Saving…"
+                : reminder
+                  ? "Save reminder image"
+                  : "Save group cover"}
             </Button>
             <Button secondary disabled={busy} onClick={() => setImage(null)}>
               Cancel crop
@@ -177,7 +194,7 @@ export function CoverEditor({
           </div>
         </>
       )}
-      {group.cover_id && !image && (
+      {assetId && !image && (
         <Button
           secondary
           disabled={busy}
@@ -186,12 +203,12 @@ export function CoverEditor({
             setError("");
             try {
               const r = await fetch(
-                "/api/groups/" + group.id + "/covers/" + group.cover_id,
+                "/api/groups/" + group.id + "/covers/" + assetId,
                 { credentials: "same-origin" },
               );
               if (!r.ok) throw new Error("Cover could not be loaded.");
               setImage(await createImageBitmap(await r.blob()));
-              setCaption(group.cover_caption || "");
+              setCaption(assetCaption || "");
               setZoom(1);
               setX(0);
               setY(0);
@@ -202,17 +219,19 @@ export function CoverEditor({
             }
           }}
         >
-          Edit current cover
+          {reminder ? "Edit reminder image" : "Edit current cover"}
         </Button>
       )}
-      {group.cover_id && !image && (
+      {assetId && !image && (
         <Button
           secondary
           disabled={busy}
           onClick={async () => {
             setBusy(true);
             try {
-              await api("/groups/" + group.id + "/cover", { method: "DELETE" });
+              await api("/groups/" + group.id + "/" + purpose, {
+                method: "DELETE",
+              });
               await reload();
               setMessage("Current cover removed.");
             } catch (e) {
@@ -222,7 +241,7 @@ export function CoverEditor({
             }
           }}
         >
-          Remove current cover
+          {reminder ? "Remove reminder image" : "Remove current cover"}
         </Button>
       )}
     </section>

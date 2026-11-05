@@ -13,6 +13,10 @@ export interface Session {
   tokenHash: string;
 }
 export interface Group {
+  bank_question_count?: number;
+  question_reminder_hours?: number;
+  reminder_image_id?: string | null;
+  reminder_image_caption?: string;
   cover_id?: string | null;
   cover_caption?: string;
   selected_questions?: number;
@@ -36,6 +40,7 @@ export interface Member {
   active: number;
   notify_open: number;
   notify_reminder: number;
+  notify_questions?: number;
   notify_issue: number;
 }
 export interface Issue {
@@ -94,6 +99,7 @@ export type Detail = {
   })[];
 };
 export type Q = {
+  used_issue_id?: string | null;
   id: string;
   text: string;
   author_name: string;
