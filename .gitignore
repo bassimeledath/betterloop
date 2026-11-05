@@ -9,7 +9,7 @@ playwright-report/
 work/
 *.log
 
-wrangler.jsonc
+/wrangler.jsonc
 ops/*.plist
 *.blbackup
 backup-key*
