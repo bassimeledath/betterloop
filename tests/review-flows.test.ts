@@ -193,31 +193,28 @@ it("sends one reminder in its pre-deadline window and never sends an expired que
 });
 
 // Desired behavior, currently fails: see review R3. Remove .fails after repairing the planner.
-it.fails(
-  "R3: a group with no selected questions must not starve another group's recurring issue",
-  async () => {
-    const owner = await h.login("writer@example.test"),
-      first = await h.group(owner),
-      second = await h.group(owner),
-      stamp = Date.now();
+it("R3: a group with no selected questions must not starve another group's recurring issue", async () => {
+  const owner = await h.login("writer@example.test"),
+    first = await h.group(owner),
+    second = await h.group(owner),
+    stamp = Date.now();
+  await h.db
+    .prepare("UPDATE questions SET selected=0 WHERE group_id=?")
+    .bind(first)
+    .run();
+  await h.db
+    .prepare("UPDATE groups SET next_delivery=? WHERE id=?")
+    .bind(stamp + DAY, first)
+    .run();
+  await h.db
+    .prepare("UPDATE groups SET next_delivery=? WHERE id=?")
+    .bind(stamp + 2 * DAY, second)
+    .run();
+  for (let i = 0; i < 4; i++) await runScheduler(h.env, stamp + i);
+  expect(
     await h.db
-      .prepare("UPDATE questions SET selected=0 WHERE group_id=?")
-      .bind(first)
-      .run();
-    await h.db
-      .prepare("UPDATE groups SET next_delivery=? WHERE id=?")
-      .bind(stamp + DAY, first)
-      .run();
-    await h.db
-      .prepare("UPDATE groups SET next_delivery=? WHERE id=?")
-      .bind(stamp + 2 * DAY, second)
-      .run();
-    for (let i = 0; i < 4; i++) await runScheduler(h.env, stamp + i);
-    expect(
-      await h.db
-        .prepare("SELECT COUNT(*) AS n FROM issues WHERE group_id=?")
-        .bind(second)
-        .first(),
-    ).toEqual({ n: 1 });
-  },
-);
+      .prepare("SELECT COUNT(*) AS n FROM issues WHERE group_id=?")
+      .bind(second)
+      .first(),
+  ).toEqual({ n: 1 });
+});

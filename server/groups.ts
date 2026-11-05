@@ -112,7 +112,9 @@ groups.post("/", async (c) => {
 groups.get("/:groupId", async (c) => {
   const gid = c.req.param("groupId"),
     m = await member(c, gid);
-  const g = await c.env.DB.prepare("SELECT * FROM groups WHERE id=?")
+  const g = await c.env.DB.prepare(
+    "SELECT g.*,(SELECT COUNT(*) FROM questions q WHERE q.group_id=g.id AND q.selected=1) AS selected_questions FROM groups g WHERE g.id=?",
+  )
     .bind(gid)
     .first<Group>();
   const people = await c.env.DB.prepare(
@@ -606,4 +608,19 @@ invitations.post("/accept", authenticate, async (c) => {
   if (!r[0].results.length)
     fail(409, "This group is full. Ask the owner for help.");
   return c.json({ groupId: i.group_id });
+});
+
+groups.patch("/:groupId/reminders", async (c) => {
+  const gid = c.req.param("groupId");
+  await member(c, gid, ["owner", "admin"]);
+  const { reminderPolicy } = await import("./reminders");
+  const values = reminderPolicy
+    .parse((await c.req.json()).hours)
+    .sort((a, b) => b - a);
+  await c.env.DB.prepare(
+    "UPDATE groups SET reminder_offsets_json=?,revision=revision+1 WHERE id=?",
+  )
+    .bind(JSON.stringify(values), gid)
+    .run();
+  return c.json({ hours: values });
 });

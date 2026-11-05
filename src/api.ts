@@ -1,3 +1,4 @@
+import { clearDrafts } from "./draft-store";
 let csrf = "";
 export function setCsrf(value: string) {
   csrf = value;
@@ -45,5 +46,10 @@ export async function api<T = Record<string, unknown>>(
   const result = (await response.json()) as T & { error?: string };
   if (!response.ok)
     throw new ApiError(result.error || "Please try again.", response.status);
+  if (
+    path === "/auth/logout" ||
+    (path === "/me" && options.method === "DELETE")
+  )
+    clearDrafts();
   return result;
 }

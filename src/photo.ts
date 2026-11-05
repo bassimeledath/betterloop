@@ -23,6 +23,8 @@ export async function preparePhoto(file: File): Promise<Blob> {
     image.close();
     throw new Error("This browser cannot prepare the photo.");
   }
+  ctx.fillStyle = "#fffefd";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
   image.close();
   const encode = (quality: number) =>

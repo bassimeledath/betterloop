@@ -2,7 +2,7 @@
 
 Private group newsletters for friends, built with React, Hono, Cloudflare Workers, D1 and private R2 storage. Members answer questions, add photos, save drafts over multiple sittings, and submit a snapshot for the next group letter.
 
-**Start with [the code review and implementation handoff](docs/CODE_REVIEW.md).** This public source snapshot includes known gaps with executable reproductions. A green CI result includes explicitly expected failures; it is not an invitation-readiness sign-off.
+**Start with [the repair notes](docs/REPAIRS.md).** The original [code review](docs/CODE_REVIEW.md) is retained as historical context. Its four defect reproductions now run as ordinary passing regressions.
 
 ## Local development
 
@@ -31,7 +31,7 @@ npm run test:e2e
 
 Vitest executes Worker routes against isolated workerd/D1/R2 bindings. Playwright drives Chromium through the real React frontend and routes API requests into those isolated bindings. Browser fixtures use synthetic people and images, capture email, and require no Cloudflare credentials. They do not call production.
 
-CI runs these checks on pushes and pull requests. It uploads browser traces and screenshots for 14 days. Known defects are named R2, R3, R4 and R6 in tests and the review; remove each expected-failure annotation when its repair is complete. Unexpectedly fixing an annotated defect also fails the corresponding check so the annotation cannot silently become stale.
+CI runs these checks on pushes and pull requests. It uploads browser traces and screenshots for 14 days. Regressions cover offline draft recovery, ambiguous saves, scheduling isolation, reminders and mobile layout. CI contains no expected-failure annotations.
 
 ## Deployment
 

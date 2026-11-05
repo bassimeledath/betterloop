@@ -60,7 +60,9 @@ async function saved(page: Page) {
 }
 async function submit(page: Page) {
   await page.getByRole("button", { name: "Review my update" }).click();
-  await page.getByRole("button", { name: "Looks good — submit" }).click();
+  await page
+    .getByRole("button", { name: /Looks good — submit|Submit changes/ })
+    .click();
   await expect(
     page.getByRole("heading", { name: "A little life update." }),
   ).toHaveCount(0);
@@ -362,13 +364,7 @@ test("R2: offline unsaved text survives a forced mobile-page close", async ({
   // Same browser storage and session, simulating a forced close rather than a navigation confirmation.
   const reopened = await page.context().newPage();
   await reopened.goto(origin + path);
-  await expect(reopened.locator("textarea").first()).toHaveValue(
-    "Saved before going offline",
-  );
-  test.fail(
-    true,
-    "R2: no durable local recovery copy exists; see CODE_REVIEW.md",
-  );
+
   await expect(reopened.locator("textarea").first()).toHaveValue(
     "Unsaved offline continuation",
   );
@@ -398,11 +394,6 @@ test("R4: a lost save response can be retried without manually copying the draft
     .fill("Committed but acknowledgement was lost");
   await expect(page.getByRole("status")).toContainText("Not saved");
   await page.getByRole("button", { name: "Retry saving" }).click();
-  await expect(page.getByRole("alert")).toContainText("another tab");
-  test.fail(
-    true,
-    "R4: save retries reuse a stale revision; see CODE_REVIEW.md",
-  );
   await expect(page.getByRole("status")).toHaveText("Saved");
 });
 
@@ -501,9 +492,27 @@ test("R6: an allowed long group name fits a narrow mobile heading", async ({
     "docs/evidence/long-name-result.json",
     JSON.stringify(width, null, 2) + "\n",
   );
-  test.fail(
-    true,
-    "R6: user-content headings do not wrap long words; see CODE_REVIEW.md",
-  );
   expect(width.page).toBeLessThanOrEqual(width.viewport);
+});
+
+test("a save rejected before commit can be retried without discarding text", async ({
+  page,
+  h,
+}) => {
+  await setup(page, h);
+  let first = true;
+  await page.route("**/contribution", async (route) => {
+    if (first) {
+      first = false;
+      await route.abort("connectionreset");
+    } else await route.fallback();
+  });
+  await page.locator("textarea").first().fill("Not yet committed");
+  await expect(page.getByRole("status")).toContainText("Not saved");
+  await page.getByRole("button", { name: "Retry saving" }).click();
+  await saved(page);
+  await page.reload();
+  await expect(page.locator("textarea").first()).toHaveValue(
+    "Not yet committed",
+  );
 });

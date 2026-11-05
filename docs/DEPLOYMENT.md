@@ -14,7 +14,7 @@ The public checkout contains an application and deployment template. It does not
 
 For private R2 copies, pass `--r2 <bucket>` and set `CLOUDFLARE_ACCOUNT_ID` in the runner's environment. `CLOUDFLARE_API_TOKEN` can supply runner credentials; otherwise the current runner reads Wrangler OAuth from the macOS preferences location. Tokens never belong in tracked files. See review R10 for portability work.
 
-The macOS installer `npm run backup:install` creates a launch agent that runs weekly while the Mac is available and logged in. Before using it, adapt its bucket name and environment to your setup; it is not a cloud scheduler. Its generated plist is ignored. No scheduled backup job was moved or reinstalled as part of publishing this repo.
+The macOS installer `npm run backup:install` creates a launch agent that runs weekly while the Mac is available and logged in. It reads account_id and the BACKUPS bucket from your private deployment config; it is not a cloud scheduler. Its generated plist is ignored. No scheduled backup job was moved or reinstalled as part of publishing this repo.
 
 Use `node scripts/backup.mjs restore --file <backup-file> --destination <new-private-directory> --key-file <key>` for isolated recovery. Read `scripts/backup.mjs` for supported flags before running it. Recovery sanitization pauses groups, disables sending, removes sessions/login tokens/pending signups, closes shared links and expires exports. Reconcile deletion records and delivery history before any production recovery.
 

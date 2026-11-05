@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "./api";
 import { PageHeading, Button, ErrorMessage, useData, when, go } from "./ui";
 import { ExportsPanel } from "./account";
-import type { Detail } from "./main";
+import type { Detail } from "../shared/contracts";
 type Rule = { day: number; hour: number; minute: number; weekday: number };
 function ScheduleEditor({
   data,
@@ -18,6 +18,9 @@ function ScheduleEditor({
     [cadence, setCadence] = useState(g.cadence),
     [zone, setZone] = useState(g.timezone),
     [rule, setRule] = useState(original),
+    [reminders, setReminders] = useState(
+      (JSON.parse(g.reminder_offsets_json || "[48]") as number[]).join(", "),
+    ),
     [preview, setPreview] = useState<number | null>(null),
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
@@ -164,6 +167,40 @@ function ScheduleEditor({
         </p>
       )}
       <button className="button secondary">Save group schedule</button>
+      <label>
+        Reminder hours before deadline
+        <input
+          value={reminders}
+          onChange={(e) => setReminders(e.target.value)}
+        />
+        <small>
+          Up to three comma-separated values from 1 to 168. Leave empty for no
+          reminders. Applies to future issues; members can opt out.
+        </small>
+      </label>
+      <button
+        type="button"
+        className="button secondary"
+        onClick={async () => {
+          try {
+            await api("/groups/" + g.id + "/reminders", {
+              method: "PATCH",
+              body: {
+                hours: reminders.trim()
+                  ? reminders.split(",").map((v) => Number(v.trim()))
+                  : [],
+              },
+            });
+            await reload();
+            setMessage("Reminder timing saved for future issues.");
+            setError("");
+          } catch (e) {
+            setError((e as Error).message);
+          }
+        }}
+      >
+        Save reminder timing
+      </button>
     </form>
   );
 }
@@ -297,6 +334,14 @@ export function GroupSettingsScreen({ gid }: { gid: string }) {
                 <small>
                   Closes {when(active.deadline, data.group.timezone)}
                 </small>
+              </p>
+              <p className="small">
+                {active.reminder_at < active.deadline &&
+                !(active as typeof active & { reminded_at?: number })
+                  .reminded_at
+                  ? "Next reminder: " +
+                    when(active.reminder_at, data.group.timezone)
+                  : "No further reminders for this issue."}
               </p>
               <label>
                 Extend until

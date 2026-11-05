@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { api } from "./api";
 import { PageHeading, Button, ErrorMessage, useData, go } from "./ui";
-import type { User } from "../server/types";
+import type { User } from "../shared/contracts";
 type LinkInfo = { enabled: boolean; configured: boolean; url: string | null };
 export function SharedLinkPanel({ gid }: { gid: string }) {
   const { data, error, refresh } = useData<LinkInfo>(

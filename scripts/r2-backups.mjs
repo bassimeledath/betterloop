@@ -20,6 +20,8 @@ export async function cloudBucketClient(bucket, accountId = account) {
   const fixedToken = process.env.CLOUDFLARE_API_TOKEN;
   const credential = async () => {
     if (fixedToken) return fixedToken;
+    if (process.platform !== "darwin")
+      throw new Error("Set CLOUDFLARE_API_TOKEN for this backup runner.");
     const text = await readFile(
       join(
         process.env.HOME,

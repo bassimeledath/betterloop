@@ -1,5 +1,6 @@
 import type { Env, Group, Issue, Publication, Update } from "./types";
 import { id, now } from "./security";
+import { reminderTime, offsets } from "./reminders";
 import type { Recurrence } from "../shared/schedule";
 export async function catchUpDelivery(
   previous: number,
@@ -57,7 +58,7 @@ export async function enqueueIssueMail(
         `INSERT OR IGNORE INTO email_outbox(id,logical_key,group_id,issue_id,user_id,recipient,kind,next_attempt,created_at,updated_at,reminder_deadline) SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE ?!='reminder' OR EXISTS(SELECT 1 FROM issues WHERE id=? AND state='open' AND deadline=?)`,
       ).bind(
         id(),
-        `${issue.id}:${kind}${kind === "reminder" ? ":" + issue.deadline : ""}:${p.user_id}`,
+        `${issue.id}:${kind}${kind === "reminder" ? ":" + issue.deadline + ":" + issue.reminder_at : ""}:${p.user_id}`,
         issue.group_id,
         issue.id,
         p.user_id,
@@ -76,7 +77,7 @@ export async function enqueueIssueMail(
 }
 async function plan(env: Env, stamp: number) {
   const g = await env.DB.prepare(
-    "SELECT * FROM groups g WHERE paused=0 AND deleted_at IS NULL AND next_delivery<=? AND NOT EXISTS(SELECT 1 FROM issues i WHERE i.group_id=g.id AND i.state IN ('scheduled','open','closing')) ORDER BY next_delivery LIMIT 1",
+    "SELECT * FROM groups g WHERE paused=0 AND deleted_at IS NULL AND next_delivery<=? AND EXISTS(SELECT 1 FROM questions q WHERE q.group_id=g.id AND q.selected=1) AND NOT EXISTS(SELECT 1 FROM issues i WHERE i.group_id=g.id AND i.state IN ('scheduled','open','closing')) ORDER BY next_delivery LIMIT 1",
   )
     .bind(stamp + 7 * 86400000)
     .first<Group>();
@@ -114,7 +115,7 @@ async function plan(env: Env, stamp: number) {
     }).format(delivery) + " letter";
   await env.DB.batch([
     env.DB.prepare(
-      "INSERT OR IGNORE INTO issues(id,group_id,title,opens_at,deadline,delivery_at,state,reminder_at,created_at) SELECT ?,?,?,?,?,?,'scheduled',?,? WHERE EXISTS(SELECT 1 FROM groups WHERE id=? AND next_delivery=? AND paused=0 AND deleted_at IS NULL) AND NOT EXISTS(SELECT 1 FROM issues WHERE group_id=? AND state IN ('scheduled','open','closing'))",
+      "INSERT OR IGNORE INTO issues(id,group_id,title,opens_at,deadline,delivery_at,state,reminder_at,created_at,reminder_offsets_json) SELECT ?,?,?,?,?,?,'scheduled',?,?,? WHERE EXISTS(SELECT 1 FROM groups WHERE id=? AND next_delivery=? AND paused=0 AND deleted_at IS NULL) AND NOT EXISTS(SELECT 1 FROM issues WHERE group_id=? AND state IN ('scheduled','open','closing'))",
     ).bind(
       iid,
       g.id,
@@ -122,8 +123,9 @@ async function plan(env: Env, stamp: number) {
       delivery - 7 * 86400000,
       delivery,
       delivery,
-      delivery - 48 * 3600000,
+      reminderTime(delivery, offsets(g.reminder_offsets_json)[0]),
       stamp,
+      g.reminder_offsets_json || "[48]",
       g.id,
       g.next_delivery,
       g.id,
@@ -260,11 +262,28 @@ export async function runScheduler(env: Env, stamp = now()) {
     return;
   }
   if (reminder) {
-    await enqueueIssueMail(env, reminder, "reminder");
-    await env.DB.prepare(
-      "UPDATE issues SET reminded_at=? WHERE id=? AND reminded_at IS NULL AND state='open' AND deadline=? AND reminder_at=?",
+    const policy = offsets(reminder.reminder_offsets_json);
+    let index = reminder.reminder_index || 0;
+    while (
+      index + 1 < policy.length &&
+      reminderTime(reminder.deadline, policy[index + 1]) <= stamp
     )
-      .bind(stamp, reminder.id, reminder.deadline, reminder.reminder_at)
+      index++;
+    const due = reminderTime(reminder.deadline, policy[index]);
+    await enqueueIssueMail(env, { ...reminder, reminder_at: due }, "reminder");
+    await env.DB.prepare(
+      "UPDATE issues SET reminder_index=?,reminder_at=?,reminded_at=? WHERE id=? AND reminded_at IS NULL AND state='open' AND deadline=? AND reminder_at=?",
+    )
+      .bind(
+        index + 1,
+        index + 1 < policy.length
+          ? reminderTime(reminder.deadline, policy[index + 1])
+          : reminder.reminder_at,
+        index + 1 < policy.length ? null : stamp,
+        reminder.id,
+        reminder.deadline,
+        reminder.reminder_at,
+      )
       .run();
     return;
   }

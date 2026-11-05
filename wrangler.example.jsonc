@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "betterloop",
+  "account_id": "REPLACE_ACCOUNT_ID",
   "main": "server/index.ts",
   "compatibility_date": "2026-08-06",
   "assets": {

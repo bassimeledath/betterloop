@@ -1,6 +1,7 @@
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
+import { parse } from "jsonc-parser";
 import { homedir } from "node:os";
 import {
   applicationRoot,
@@ -11,6 +12,16 @@ import {
 if (process.platform !== "darwin")
   throw new Error(
     "This installer supports macOS launchd. Run backup.mjs from your own scheduler on other systems.",
+  );
+const settings = parse(
+  await readFile(join(applicationRoot, "wrangler.jsonc"), "utf8"),
+);
+const backupBucket = settings.r2_buckets?.find(
+  (b) => b.binding === "BACKUPS",
+)?.bucket_name;
+if (!backupBucket || !settings.account_id)
+  throw new Error(
+    "Configure account_id and BACKUPS in wrangler.jsonc before installing backups.",
   );
 const label = "com.betterloop.backup",
   target = "gui/" + process.getuid() + "/" + label;
@@ -39,7 +50,7 @@ const args = [
   "--key-file",
   defaultBackupKeyPath,
   "--r2",
-  "betterloop-backups",
+  backupBucket,
 ];
 const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -47,7 +58,7 @@ const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <key>Label</key><string>${label}</string>
 <key>ProgramArguments</key><array>${strings(args)}</array>
 <key>WorkingDirectory</key><string>${xml(applicationRoot)}</string>
-<key>EnvironmentVariables</key><dict><key>PATH</key><string>${xml(dirname(process.execPath) + ":/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin")}</string></dict>
+<key>EnvironmentVariables</key><dict><key>CLOUDFLARE_ACCOUNT_ID</key><string>${xml(settings.account_id)}</string><key>PATH</key><string>${xml(dirname(process.execPath) + ":/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin")}</string></dict>
 <key>StartCalendarInterval</key><dict><key>Weekday</key><integer>0</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
 <key>RunAtLoad</key><true/><key>ProcessType</key><string>Background</string>
 <key>LowPriorityIO</key><true/><key>Nice</key><integer>10</integer>
@@ -85,7 +96,7 @@ console.log(
     destination: defaultBackupDirectory,
     keyFile: defaultBackupKeyPath,
     agent: agentPath,
-    cloudBucket: "betterloop-backups",
+    cloudBucket: backupBucket,
     initialBackup: "weekly backup check started",
   }),
 );

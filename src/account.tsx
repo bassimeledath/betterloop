@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import type { User } from "../server/types";
+import type { User } from "../shared/contracts";
 import { api } from "./api";
 import { PageHeading, Button, ErrorMessage, useData, when, go } from "./ui";
 type Me = { user: User; csrf: string };

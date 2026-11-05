@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { App, Issue, Contribution, Update } from "./types";
 import { id, now, member, fail, audit } from "./security";
+import { offsets, reminderTime } from "./reminders";
 import { redactPublication } from "./privacy";
 export const issues = new Hono<App>();
 export const emptyUpdate: Update = {
@@ -143,11 +144,16 @@ issues.post("/:groupId/issues", async (c) => {
   ).results;
   if (!qs.length)
     fail(400, "Choose at least one question before opening an issue.");
+  const policy = await c.env.DB.prepare(
+    "SELECT reminder_offsets_json FROM groups WHERE id=?",
+  )
+    .bind(gid)
+    .first<{ reminder_offsets_json: string }>();
   const iid = id(),
     stamp = now();
   const result = await c.env.DB.batch([
     c.env.DB.prepare(
-      "INSERT OR IGNORE INTO issues(id,group_id,title,opens_at,deadline,delivery_at,state,reminder_at,created_at,creation_key) SELECT ?,?,?,?,?,?,'open',?,?,? WHERE NOT EXISTS(SELECT 1 FROM issues WHERE group_id=? AND state IN ('scheduled','open','closing')) RETURNING id",
+      "INSERT OR IGNORE INTO issues(id,group_id,title,opens_at,deadline,delivery_at,state,reminder_at,created_at,creation_key,reminder_offsets_json) SELECT ?,?,?,?,?,?,'open',?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM issues WHERE group_id=? AND state IN ('scheduled','open','closing')) RETURNING id",
     ).bind(
       iid,
       gid,
@@ -155,9 +161,10 @@ issues.post("/:groupId/issues", async (c) => {
       stamp,
       b.deliveryAt,
       b.deliveryAt,
-      b.deliveryAt - 48 * 3600000,
+      reminderTime(b.deliveryAt, offsets(policy?.reminder_offsets_json)[0]),
       stamp,
       creationKey,
+      policy?.reminder_offsets_json || "[48]",
       gid,
     ),
     ...qs.map((q, j) =>
@@ -354,9 +361,15 @@ issues.patch("/:groupId/issues/:issueId", async (c) => {
     if (!b.deadline || b.deadline <= Math.max(stamp, issue.deadline))
       fail(400, "Choose a deadline later than the current deadline.");
     const r = await c.env.DB.prepare(
-      "UPDATE issues SET deadline=?,delivery_at=?,reminder_at=?,reminded_at=NULL,revision=revision+1 WHERE id=? AND group_id=? AND state IN ('scheduled','open') RETURNING id",
+      "UPDATE issues SET deadline=?,delivery_at=?,reminder_at=?,reminded_at=NULL,reminder_index=0,revision=revision+1 WHERE id=? AND group_id=? AND state IN ('scheduled','open') RETURNING id",
     )
-      .bind(b.deadline, b.deadline, b.deadline - 48 * 3600000, iid, gid)
+      .bind(
+        b.deadline,
+        b.deadline,
+        reminderTime(b.deadline, offsets(issue.reminder_offsets_json)[0]),
+        iid,
+        gid,
+      )
       .first();
     if (!r) fail(409, "This issue has already closed.");
   } else

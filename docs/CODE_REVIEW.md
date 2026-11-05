@@ -1,5 +1,7 @@
 # Betterloop code review and implementation handoff
 
+**Repair status:** See [implementation and verification](REPAIRS.md). This document preserves the original findings; its expected-failure counts describe the pre-repair baseline.
+
 Reviewed November 4, 2026. Audience: the owner and an implementation LLM working in this repository.
 
 **Recommendation: repair the priority-one items before inviting the full friend group.** The core architecture is appropriate for this scale, and normal saving, resubmission, photo upload and publication work. The remaining risks are concentrated in draft recovery, scheduling and the distinction between a saved draft and a submitted update. Reminder frequency is not configurable yet.

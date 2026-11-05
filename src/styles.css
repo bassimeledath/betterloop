@@ -582,3 +582,32 @@ details.panel summary {
 main:focus {
   outline: none;
 }
+
+h1,
+h2,
+h3,
+.masthead p,
+figcaption {
+  overflow-wrap: anywhere;
+}
+.panel,
+.hero,
+.letter,
+.member-row > *,
+.photos > * {
+  min-width: 0;
+}
+.photos {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--plum);
+  outline-offset: 2px;
+}
+@media (max-width: 650px) {
+  .panel .photos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
