@@ -14,7 +14,7 @@ export interface Env {
   EMAIL_FROM?: string;
   EMAIL?: {
     send(message: {
-      from: string;
+      from: string | { email: string; name: string };
       to: string;
       subject: string;
       html: string;

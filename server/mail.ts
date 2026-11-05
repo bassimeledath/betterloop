@@ -360,7 +360,7 @@ export async function processOutbox(env: Env, limit = 2) {
           await redactPublication(env, JSON.parse(r.content_json)),
           url,
         );
-        subject = groupName + ": your little letter is here";
+        subject = "Betterloop · " + groupName + ": your little letter is here";
         html = m.html;
         text = m.text;
       } else {
@@ -378,6 +378,7 @@ export async function processOutbox(env: Env, limit = 2) {
         const due = deadline + " (" + collection.timezone + ")";
         const preferences = origin + "/groups/" + o.group_id + "/preferences";
         subject =
+          "Betterloop · " +
           groupName +
           (o.kind === "reminder"
             ? ": a little reminder"
@@ -431,7 +432,7 @@ export async function processOutbox(env: Env, limit = 2) {
           });
         provider = (
           await env.EMAIL.send({
-            from: env.EMAIL_FROM,
+            from: { email: env.EMAIL_FROM, name: "Betterloop" },
             to: o.recipient,
             subject,
             html,

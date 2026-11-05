@@ -478,7 +478,17 @@ it("retries definite provider rejections at most five times, then records a know
     EMAIL_MODE: "live" as const,
     EMAIL_FROM: "sender@example.test",
     EMAIL: {
-      send: async () => {
+      send: async (message: {
+        from: string | { email: string; name: string };
+        subject: string;
+      }) => {
+        expect(message.from).toEqual({
+          email: "sender@example.test",
+          name: "Betterloop",
+        });
+        expect(message.subject).toBe(
+          "Betterloop · Test circle: time for a little update",
+        );
         sends++;
         throw Object.assign(new Error("Explicit rejection"), {
           code: "E_RATE_LIMITED",
