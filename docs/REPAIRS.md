@@ -13,7 +13,7 @@ The implementation addresses the review's software findings while retaining one 
 | R7 Cron resilience | Bounded stages have independent error boundaries and individual health records. Mail runs before export/cleanup work. An injected cleanup R2 failure records failure while eligible mail still sends. |
 | R8 Modules | Authentication screens, group screens, composer, reader, shared DTOs, operator routes, Cron orchestration, reminder policy and draft storage have dedicated modules. The routing file no longer contains composition/reading logic. No new service or framework was introduced. |
 | R9 Photo polish | Review shows captions; transparent input composites onto paper; reader photos open full size through the authenticated asset endpoint. Empty answer/shout-out/good-thing panels are omitted. Unsupported HEIC is no longer advertised by the file picker. Preparation/saving has a visible state. |
-| R10 Operations | Backup installation reads account/bucket from private deployment config and passes the account to the runner. Non-macOS runners require an explicit API token instead of looking in a macOS credential directory. Generated plists remain ignored. Existing recovery keys and installed backup jobs are preserved. |
+| R10 Operations | Backup installation reads account/bucket from private deployment config and passes the account to the runner. Non-macOS runners require an explicit API token or credential file path instead of looking in a macOS credential directory. Generated plists remain ignored. Existing recovery keys and installed backup jobs are preserved. |
 
 ## Reminder semantics
 

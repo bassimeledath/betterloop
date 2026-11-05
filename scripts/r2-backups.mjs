@@ -20,15 +20,19 @@ export async function cloudBucketClient(bucket, accountId = account) {
   const fixedToken = process.env.CLOUDFLARE_API_TOKEN;
   const credential = async () => {
     if (fixedToken) return fixedToken;
-    if (process.platform !== "darwin")
-      throw new Error("Set CLOUDFLARE_API_TOKEN for this backup runner.");
-    const text = await readFile(
-      join(
-        process.env.HOME,
-        "Library/Preferences/.wrangler/config/default.toml",
-      ),
-      "utf8",
-    );
+    const credentialPath =
+      process.env.BETTERLOOP_WRANGLER_CONFIG ||
+      (process.platform === "darwin"
+        ? join(
+            process.env.HOME,
+            "Library/Preferences/.wrangler/config/default.toml",
+          )
+        : null);
+    if (!credentialPath)
+      throw new Error(
+        "Set CLOUDFLARE_API_TOKEN or BETTERLOOP_WRANGLER_CONFIG for this backup runner.",
+      );
+    const text = await readFile(credentialPath, "utf8");
     const token = text.match(/^oauth_token\s*=\s*"([^"]+)"/m)?.[1];
     if (!token) throw new Error("Cloudflare authentication is required.");
     return token;

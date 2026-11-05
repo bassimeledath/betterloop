@@ -5,6 +5,8 @@ import { createHash } from "node:crypto";
 import { photoBucket } from "../scripts/backup-paths.mjs";
 
 vi.hoisted(() => {
+  process.env.BETTERLOOP_WRANGLER_CONFIG =
+    "/fixture/.wrangler/config/default.toml";
   process.env.CLOUDFLARE_ACCOUNT_ID = "00000000000000000000000000000000";
 });
 const auth = vi.hoisted(() => ({

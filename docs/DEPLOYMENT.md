@@ -12,7 +12,7 @@ The public checkout contains an application and deployment template. It does not
 
 `node scripts/backup.mjs create` exports D1 and referenced private photos into an encrypted backup. Keep its recovery key separately from the ciphertext. Use `--directory` and `--key-file` for explicit destinations; production backup requires your ignored deployment config and cloud credentials. `--local` uses only emulated resources.
 
-For private R2 copies, pass `--r2 <bucket>` and set `CLOUDFLARE_ACCOUNT_ID` in the runner's environment. `CLOUDFLARE_API_TOKEN` can supply runner credentials; otherwise the current runner reads Wrangler OAuth from the macOS preferences location. Tokens never belong in tracked files. See review R10 for portability work.
+For private R2 copies, pass `--r2 <bucket>` and set `CLOUDFLARE_ACCOUNT_ID` in the runner's environment. `CLOUDFLARE_API_TOKEN` can supply runner credentials; otherwise set `BETTERLOOP_WRANGLER_CONFIG` to an explicit credential file. On macOS the default is Wrangler’s preferences location. Tokens never belong in tracked files. See review R10 for portability work.
 
 The macOS installer `npm run backup:install` creates a launch agent that runs weekly while the Mac is available and logged in. It reads account_id and the BACKUPS bucket from your private deployment config; it is not a cloud scheduler. Its generated plist is ignored. No scheduled backup job was moved or reinstalled as part of publishing this repo.
 
