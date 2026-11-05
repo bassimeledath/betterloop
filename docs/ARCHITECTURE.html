@@ -2,9 +2,9 @@
 :root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f2edf6;color:#302536;font:16px/1.7 Arial,sans-serif}main{max-width:1080px;margin:40px auto;padding:56px 64px;background:#fffefd;border:1px solid #e2d8e7;border-radius:20px}h1,h2,h3{font-family:Georgia,serif;line-height:1.25;color:#533b60}h1{font-size:38px;max-width:780px}h2{font-size:28px;margin:55px 0 22px;border-top:1px solid #e2d8e7;padding-top:25px}h3{font-size:21px;margin-top:30px}p{max-width:80ch}a{color:#71507e}code{font-size:.88em;background:#f2edf6;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere}table{width:100%;border-collapse:collapse;font-size:14px;line-height:1.55;margin:24px 0}th,td{text-align:left;vertical-align:top;border-bottom:1px solid #e2d8e7;padding:12px}th{background:#f2edf6}td:first-child{width:27%}li{margin:9px 0}figure{margin:28px 0;padding:18px;border:1px solid #e2d8e7;border-radius:12px;overflow:auto}figure svg{width:100%;height:auto;display:block}figcaption{font-size:13px;color:#65596b;text-align:center;margin-top:15px}header{font-size:12px;letter-spacing:.12em;font-weight:bold;color:#71507e}nav{background:#f5f1f7;padding:20px 25px;border-radius:12px}nav ul{columns:2;padding-left:20px;font-size:14px}nav li{break-inside:avoid} @media(max-width:700px){main{margin:0;padding:25px 18px;border:0;border-radius:0}h1{font-size:31px}table{font-size:12px}th,td{padding:8px}nav ul{columns:1}figure{padding:6px}figure svg{min-width:600px}} @media print{body{background:white;font-size:10pt}main{padding:0;border:0;margin:0;max-width:none}h1{font-size:25pt}h2{break-after:avoid;font-size:18pt}h3{break-after:avoid}figure, tr{break-inside:avoid}figure svg{max-height:240mm}a{color:inherit}nav{display:none}code{font-size:9pt}table{font-size:9pt}}
 </style><main><header>BETTERLOOP / ENGINEERING REFERENCE</header><h1 id="betterloop-architecture-and-supported-flows">Betterloop architecture and supported flows</h1>
 <p>Document ID: BL-ARCH-001<br />
-Revision: 1<br />
-Date: 2026-11-04<br />
-Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
+Revision: 2<br />
+Date: 2026-11-05<br />
+Source baseline: <code>7de3fbbe07b7f83d60543bb4eae1081693404b1a</code></p>
 <nav aria-label="Contents"><b>Contents</b><ul><li><a href="#1-purpose-and-document-rules">1. Purpose and document rules</a></li><li><a href="#2-system-boundary">2. System boundary</a></li><li><a href="#3-roles-and-capacity">3. Roles and capacity</a></li><li><a href="#4-join-a-group-and-sign-in">4. Join a group and sign in</a></li><li><a href="#5-create-a-group-and-choose-questions">5. Create a group and choose questions</a></li><li><a href="#6-write-save-submit-and-edit-again">6. Write, save, submit, and edit again</a></li><li><a href="#7-open-issues-remind-members-and-publish">7. Open issues, remind members, and publish</a></li><li><a href="#8-upload-photos-and-edit-the-cover">8. Upload photos and edit the cover</a></li><li><a href="#9-durable-data-and-access-rules">9. Durable data and access rules</a></li><li><a href="#10-background-work-and-email-reliability">10. Background work and email reliability</a></li><li><a href="#11-export-backup-and-recovery">11. Export, backup, and recovery</a></li><li><a href="#12-supported-flow-verification">12. Supported-flow verification</a></li><li><a href="#13-limits-and-extension-points">13. Limits and extension points</a></li><li><a href="#14-technical-noun-register">14. Technical noun register</a></li><li><a href="#15-references-and-maintenance">15. References and maintenance</a></li></ul></nav><h2 id="1-purpose-and-document-rules">1. Purpose and document rules</h2>
 <p>Betterloop makes private newsletters for small groups. Members answer questions and add photos. The application puts submitted updates into one letter.</p>
 <p>This document describes the source at the baseline above. It does not contain private group records, invitation tokens, or credentials.</p>
@@ -507,10 +507,14 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 </table>
 <h2 id="5-create-a-group-and-choose-questions">5. Create a group and choose questions</h2>
 <p>The creator supplies a name, description, timezone, and recurrence. The API checks the creation allowance and total group limit. It creates the group and owner membership together.</p>
-<p>The initial question set contains three starter questions. Members can add questions to the group collection. Owners and administrators select and order up to ten questions.</p>
-<p>The collection holds at most two hundred questions. Selected questions remain selected until the host changes them. The application does not select random questions or rotate a question bank automatically.</p>
-<p>A new issue receives copies of the selected questions and author names. Later changes to the collection do not change that issue. Members can suggest questions before the next issue.</p>
-<p>An automatic issue needs at least one selected question. A group without selected questions shows a blocked state. It does not prevent other groups from advancing.</p>
+<p>Each issue receives one rotating bank question by default. The host can select zero to five bank questions. The bank has twenty-four questions with stable identifiers.</p>
+<p>The selector uses questions with the oldest use first. Unused questions come first. Thus, the bank does not repeat until all bank questions have been used.</p>
+<p>Members can add their own questions. New member questions enter the queue automatically. The host can remove a question from the queue or select it again.</p>
+<p>Each issue has at most ten questions. Bank questions take the first places. Member questions fill the remaining places in queue order.</p>
+<p>A database batch copies the questions and marks included member questions as used. Used member questions do not carry forward. Extra member questions stay queued.</p>
+<p>The pending collection holds at most two hundred member questions. Open issues keep their question copies. Existing drafts and answer identifiers do not change.</p>
+<p>Questions close seven days before delivery, when the answer window opens. Late member questions wait for a later issue. A manual opening uses the current queue immediately.</p>
+<p>An automatic issue needs a bank question or an eligible member question. A group without either does not block other groups.</p>
 <h2 id="6-write-save-submit-and-edit-again">6. Write, save, submit, and edit again</h2>
 <p><figure>
 
@@ -688,31 +692,48 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <!-- Generated by graphviz version 12.1.2 (20240928.0832)
  -->
 <!-- Title: architecture Pages: 1 -->
-<svg width="839pt" height="457pt"
- viewBox="0.00 0.00 838.91 456.90" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(18 438.9)">
+<svg width="893pt" height="485pt"
+ viewBox="0.00 0.00 892.66 485.40" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(18 467.4)">
 <title>architecture</title>
-<polygon fill="#fffefd" stroke="none" points="-18,18 -18,-438.9 820.91,-438.9 820.91,18 -18,18"/>
+<polygon fill="#fffefd" stroke="none" points="-18,18 -18,-467.4 874.66,-467.4 874.66,18 -18,18"/>
 <!-- bank -->
 <g id="node1" class="node">
 <title>bank</title>
-<path fill="#f2edf6" stroke="#b5a0c0" d="M528.41,-420.9C528.41,-420.9 380.12,-420.9 380.12,-420.9 374.12,-420.9 368.12,-414.9 368.12,-408.9 368.12,-408.9 368.12,-387.12 368.12,-387.12 368.12,-381.12 374.12,-375.12 380.12,-375.12 380.12,-375.12 528.41,-375.12 528.41,-375.12 534.41,-375.12 540.41,-381.12 540.41,-387.12 540.41,-387.12 540.41,-408.9 540.41,-408.9 540.41,-414.9 534.41,-420.9 528.41,-420.9"/>
-<text text-anchor="middle" x="454.27" y="-400.86" font-family="Arial" font-size="12.00" fill="#302536">Members suggest questions</text>
-<text text-anchor="middle" x="454.27" y="-386.61" font-family="Arial" font-size="12.00" fill="#302536">Host selects up to 10</text>
+<path fill="#f2edf6" stroke="#b5a0c0" d="M735.29,-449.4C735.29,-449.4 523.25,-449.4 523.25,-449.4 517.25,-449.4 511.25,-443.4 511.25,-437.4 511.25,-437.4 511.25,-401.37 511.25,-401.37 511.25,-395.37 517.25,-389.37 523.25,-389.37 523.25,-389.37 735.29,-389.37 735.29,-389.37 741.29,-389.37 747.29,-395.37 747.29,-401.37 747.29,-401.37 747.29,-437.4 747.29,-437.4 747.29,-443.4 741.29,-449.4 735.29,-449.4"/>
+<text text-anchor="middle" x="629.27" y="-429.36" font-family="Arial" font-size="12.00" fill="#302536">Rotating bank: default 1</text>
+<text text-anchor="middle" x="629.27" y="-415.11" font-family="Arial" font-size="12.00" fill="#302536">Member queue: use each question once</text>
+<text text-anchor="middle" x="629.27" y="-400.86" font-family="Arial" font-size="12.00" fill="#302536">10 questions per issue maximum</text>
 </g>
 <!-- scheduled -->
 <g id="node2" class="node">
 <title>scheduled</title>
-<path fill="#f2edf6" stroke="#b5a0c0" d="M542.66,-327.12C542.66,-327.12 365.88,-327.12 365.88,-327.12 359.88,-327.12 353.88,-321.12 353.88,-315.12 353.88,-315.12 353.88,-293.34 353.88,-293.34 353.88,-287.34 359.88,-281.34 365.88,-281.34 365.88,-281.34 542.66,-281.34 542.66,-281.34 548.66,-281.34 554.66,-287.34 554.66,-293.34 554.66,-293.34 554.66,-315.12 554.66,-315.12 554.66,-321.12 548.66,-327.12 542.66,-327.12"/>
-<text text-anchor="middle" x="454.27" y="-307.08" font-family="Arial" font-size="12.00" fill="#302536">scheduled</text>
-<text text-anchor="middle" x="454.27" y="-292.83" font-family="Arial" font-size="12.00" fill="#302536">Copy questions + reminder policy</text>
+<path fill="#f2edf6" stroke="#b5a0c0" d="M554.66,-341.37C554.66,-341.37 353.88,-341.37 353.88,-341.37 347.88,-341.37 341.88,-335.37 341.88,-329.37 341.88,-329.37 341.88,-293.34 341.88,-293.34 341.88,-287.34 347.88,-281.34 353.88,-281.34 353.88,-281.34 554.66,-281.34 554.66,-281.34 560.66,-281.34 566.66,-287.34 566.66,-293.34 566.66,-293.34 566.66,-329.37 566.66,-329.37 566.66,-335.37 560.66,-341.37 554.66,-341.37"/>
+<text text-anchor="middle" x="454.27" y="-321.33" font-family="Arial" font-size="12.00" fill="#302536">scheduled</text>
+<text text-anchor="middle" x="454.27" y="-307.08" font-family="Arial" font-size="12.00" fill="#302536">Freeze questions + reminder policy</text>
+<text text-anchor="middle" x="454.27" y="-292.83" font-family="Arial" font-size="12.00" fill="#302536">Consume included member questions</text>
 </g>
 <!-- bank&#45;&gt;scheduled -->
-<g id="edge1" class="edge">
+<g id="edge3" class="edge">
 <title>bank&#45;&gt;scheduled</title>
-<path fill="none" stroke="#71507e" d="M454.27,-374.79C454.27,-363.15 454.27,-348.72 454.27,-336.02"/>
-<polygon fill="#71507e" stroke="#71507e" points="456.72,-336.07 454.27,-329.07 451.82,-336.07 456.72,-336.07"/>
-<text text-anchor="middle" x="526.64" y="-347.62" font-family="Arial" font-size="10.00" fill="#65596b">Planner: within 7 days of delivery</text>
+<path fill="none" stroke="#71507e" d="M510.83,-399.6C495.03,-392.82 480.26,-383.68 468.52,-371.37 462.85,-365.42 459.31,-357.62 457.13,-349.64"/>
+<polygon fill="#71507e" stroke="#71507e" points="459.6,-349.46 455.7,-343.15 454.81,-350.51 459.6,-349.46"/>
+<text text-anchor="middle" x="540.89" y="-361.87" font-family="Arial" font-size="10.00" fill="#65596b">Planner: within 7 days of delivery</text>
+</g>
+<!-- questions -->
+<g id="node9" class="node">
+<title>questions</title>
+<path fill="#f2edf6" stroke="#b5a0c0" d="M844.66,-341.37C844.66,-341.37 631.88,-341.37 631.88,-341.37 625.88,-341.37 619.88,-335.37 619.88,-329.37 619.88,-329.37 619.88,-293.34 619.88,-293.34 619.88,-287.34 625.88,-281.34 631.88,-281.34 631.88,-281.34 844.66,-281.34 844.66,-281.34 850.66,-281.34 856.66,-287.34 856.66,-293.34 856.66,-293.34 856.66,-329.37 856.66,-329.37 856.66,-335.37 850.66,-341.37 844.66,-341.37"/>
+<text text-anchor="middle" x="738.27" y="-321.33" font-family="Arial" font-size="12.00" fill="#302536">Question reminder</text>
+<text text-anchor="middle" x="738.27" y="-307.08" font-family="Arial" font-size="12.00" fill="#302536">Default: 24 hours before answer window</text>
+<text text-anchor="middle" x="738.27" y="-292.83" font-family="Arial" font-size="12.00" fill="#302536">Skip members with a queued question</text>
+</g>
+<!-- bank&#45;&gt;questions -->
+<g id="edge1" class="edge">
+<title>bank&#45;&gt;questions</title>
+<path fill="none" stroke="#71507e" d="M720.48,-388.99C726.97,-384 732.73,-378.17 737.27,-371.37 741.49,-365.05 743.35,-357.44 743.86,-349.81"/>
+<polygon fill="#71507e" stroke="#71507e" points="746.31,-350.13 743.92,-343.11 741.41,-350.08 746.31,-350.13"/>
+<text text-anchor="middle" x="792.15" y="-361.87" font-family="Arial" font-size="10.00" fill="#65596b">Before questions close</text>
 </g>
 <!-- open -->
 <g id="node3" class="node">
@@ -722,10 +743,10 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <text text-anchor="middle" x="454.27" y="-199.05" font-family="Arial" font-size="12.00" fill="#302536">Opening email enters outbox</text>
 </g>
 <!-- scheduled&#45;&gt;open -->
-<g id="edge2" class="edge">
+<g id="edge4" class="edge">
 <title>scheduled&#45;&gt;open</title>
-<path fill="none" stroke="#71507e" d="M454.27,-281.01C454.27,-269.37 454.27,-254.94 454.27,-242.24"/>
-<polygon fill="#71507e" stroke="#71507e" points="456.72,-242.29 454.27,-235.29 451.82,-242.29 456.72,-242.29"/>
+<path fill="none" stroke="#71507e" d="M454.27,-280.95C454.27,-268.64 454.27,-254.34 454.27,-241.92"/>
+<polygon fill="#71507e" stroke="#71507e" points="456.72,-242.19 454.27,-235.19 451.82,-242.19 456.72,-242.19"/>
 <text text-anchor="middle" x="483.14" y="-253.84" font-family="Arial" font-size="10.00" fill="#65596b">Opening time</text>
 </g>
 <!-- closing -->
@@ -736,10 +757,10 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <text text-anchor="middle" x="247.27" y="-105.27" font-family="Arial" font-size="12.00" fill="#302536">Deadline passed; edits rejected</text>
 </g>
 <!-- scheduled&#45;&gt;closing -->
-<g id="edge5" class="edge">
+<g id="edge7" class="edge">
 <title>scheduled&#45;&gt;closing</title>
-<path fill="none" stroke="#71507e" d="M353.46,-281.57C325.52,-271.14 297.43,-255.82 277.52,-233.34 256.74,-209.89 249.95,-173.88 247.87,-148.28"/>
-<polygon fill="#71507e" stroke="#71507e" points="250.34,-148.36 247.44,-141.54 245.45,-148.68 250.34,-148.36"/>
+<path fill="none" stroke="#71507e" d="M345.04,-280.88C319.91,-269.59 295.37,-254.19 277.52,-233.34 257.15,-209.54 250.28,-173.59 248.08,-148.1"/>
+<polygon fill="#71507e" stroke="#71507e" points="250.54,-148.2 247.61,-141.39 245.66,-148.55 250.54,-148.2"/>
 <text text-anchor="middle" x="315.39" y="-206.95" font-family="Arial" font-size="10.00" fill="#65596b">Deadline reached</text>
 </g>
 <!-- cancelled -->
@@ -750,10 +771,10 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <text text-anchor="middle" x="700.27" y="-105.27" font-family="Arial" font-size="12.00" fill="#302536">Host cancellation or deleted group</text>
 </g>
 <!-- scheduled&#45;&gt;cancelled -->
-<g id="edge9" class="edge">
+<g id="edge11" class="edge">
 <title>scheduled&#45;&gt;cancelled</title>
-<path fill="none" stroke="#71507e" d="M491.64,-280.96C500.5,-275.4 509.83,-269.32 518.27,-263.34 572.68,-224.81 632.44,-175.54 668.12,-145.31"/>
-<polygon fill="#71507e" stroke="#71507e" points="669.6,-147.28 673.34,-140.88 666.42,-143.54 669.6,-147.28"/>
+<path fill="none" stroke="#71507e" d="M494.74,-281.01C502.59,-275.21 510.72,-269.13 518.27,-263.34 570.72,-223.11 630.33,-174.92 666.61,-145.3"/>
+<polygon fill="#71507e" stroke="#71507e" points="668.07,-147.27 671.94,-140.95 664.96,-143.48 668.07,-147.27"/>
 </g>
 <!-- reminder -->
 <g id="node4" class="node">
@@ -763,27 +784,27 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <text text-anchor="middle" x="470.27" y="-105.27" font-family="Arial" font-size="12.00" fill="#302536">Queue only unsubmitted members</text>
 </g>
 <!-- open&#45;&gt;reminder -->
-<g id="edge3" class="edge">
+<g id="edge5" class="edge">
 <title>open&#45;&gt;reminder</title>
 <path fill="none" stroke="#71507e" d="M432.35,-187.09C426.15,-178.07 422.15,-167.47 426.52,-157.56 428.34,-153.45 430.81,-149.57 433.66,-145.98"/>
 <polygon fill="#71507e" stroke="#71507e" points="435.32,-147.81 438.14,-140.95 431.66,-144.55 435.32,-147.81"/>
 <text text-anchor="middle" x="446.39" y="-160.06" font-family="Arial" font-size="10.00" fill="#65596b">Next slot</text>
 </g>
 <!-- open&#45;&gt;closing -->
-<g id="edge6" class="edge">
+<g id="edge8" class="edge">
 <title>open&#45;&gt;closing</title>
 <path fill="none" stroke="#71507e" d="M386.23,-187.08C371.64,-181.75 356.43,-175.79 342.52,-169.56 325.68,-162.02 307.77,-152.65 292.09,-143.96"/>
 <polygon fill="#71507e" stroke="#71507e" points="293.67,-142.04 286.37,-140.76 291.28,-146.31 293.67,-142.04"/>
 <text text-anchor="middle" x="380.39" y="-160.06" font-family="Arial" font-size="10.00" fill="#65596b">Deadline reached</text>
 </g>
 <!-- open&#45;&gt;cancelled -->
-<g id="edge10" class="edge">
+<g id="edge12" class="edge">
 <title>open&#45;&gt;cancelled</title>
 <path fill="none" stroke="#71507e" d="M514.13,-187.12C549.98,-173.74 595.65,-156.7 632.78,-142.85"/>
 <polygon fill="#71507e" stroke="#71507e" points="633.44,-145.22 639.15,-140.47 631.73,-140.63 633.44,-145.22"/>
 </g>
 <!-- reminder&#45;&gt;open -->
-<g id="edge4" class="edge">
+<g id="edge6" class="edge">
 <title>reminder&#45;&gt;open</title>
 <path fill="none" stroke="#71507e" d="M470.86,-140.06C470.73,-149.27 470.09,-160 468.27,-169.56 467.65,-172.79 466.83,-176.12 465.88,-179.4"/>
 <polygon fill="#71507e" stroke="#71507e" points="463.57,-178.55 463.78,-185.97 468.24,-180.04 463.57,-178.55"/>
@@ -797,7 +818,7 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <text text-anchor="middle" x="126.27" y="-11.49" font-family="Arial" font-size="12.00" fill="#302536">Snapshot + publication outbox in one batch</text>
 </g>
 <!-- closing&#45;&gt;published -->
-<g id="edge7" class="edge">
+<g id="edge9" class="edge">
 <title>closing&#45;&gt;published</title>
 <path fill="none" stroke="#71507e" d="M217.98,-93.45C201.16,-80.7 179.91,-64.58 162.1,-51.07"/>
 <polygon fill="#71507e" stroke="#71507e" points="163.97,-49.41 156.92,-47.14 161.01,-53.32 163.97,-49.41"/>
@@ -811,11 +832,18 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <text text-anchor="middle" x="368.27" y="-11.49" font-family="Arial" font-size="12.00" fill="#302536">No eligible submitted updates</text>
 </g>
 <!-- closing&#45;&gt;skipped -->
-<g id="edge8" class="edge">
+<g id="edge10" class="edge">
 <title>closing&#45;&gt;skipped</title>
 <path fill="none" stroke="#71507e" d="M290.67,-93.43C299.76,-88.09 309.07,-82.09 317.27,-75.78 326.28,-68.84 335.27,-60.37 343.12,-52.29"/>
 <polygon fill="#71507e" stroke="#71507e" points="344.8,-54.08 347.85,-47.32 341.25,-50.7 344.8,-54.08"/>
 <text text-anchor="middle" x="372.56" y="-66.28" font-family="Arial" font-size="10.00" fill="#65596b">No eligible updates</text>
+</g>
+<!-- questions&#45;&gt;bank -->
+<g id="edge2" class="edge">
+<title>questions&#45;&gt;bank</title>
+<path fill="none" stroke="#71507e" d="M640.69,-341.84C634.26,-346.8 628.56,-352.6 624.02,-359.37 619.82,-365.65 618.46,-373.18 618.65,-380.73"/>
+<polygon fill="#71507e" stroke="#71507e" points="616.18,-380.62 619.28,-387.36 621.06,-380.16 616.18,-380.62"/>
+<text text-anchor="middle" x="677.64" y="-361.87" font-family="Arial" font-size="10.00" fill="#65596b">Member adds a question</text>
 </g>
 </g>
 </svg>
@@ -826,11 +854,15 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <p>The host can open an issue manually. The host can extend an active deadline, but cannot shorten it through the extension action. Extension also moves delivery time.</p>
 <p>Only one scheduled, open, or closing issue can exist per group. A group pause cancels scheduled issues and skips queued opening or reminder messages. An already open issue can still close and publish.</p>
 <h3 id="72-reminder-policy">7.2 Reminder policy</h3>
-<p>The host can configure zero to three reminder offsets. Each offset is a distinct whole number from one to 168 hours before the deadline. The default is forty-eight hours.</p>
+<p>The host can configure zero to three reminder offsets. Each offset is a distinct whole number from one to 168 hours before the deadline. The default is twenty-four hours.</p>
 <p>New issues copy the policy. Group policy changes affect future issues. Extending an active issue recalculates its remaining reminder schedule from that issue's saved policy.</p>
 <p>Each reminder slot has a unique outbox identity. After downtime, the scheduler queues only the most recent due slot. It does not send every missed reminder.</p>
 <p>A reminder targets active members without a submitted copy. The sender checks submission, preferences, address eligibility, deadline, and membership again before sending. A submitted member receives no reminder.</p>
 <p>A withdrawn member can receive remaining future reminders. Completed reminder slots do not reopen. A short manually opened issue can receive one catch-up reminder before its deadline.</p>
+<p>The host can configure a separate image for submission reminders. The image uses the private cover storage and crop controls. Email includes it as an inline attachment.</p>
+<p>A separate email asks members to contribute questions. Its default timing is twenty-four hours before questions close. The host can change this offset or disable it.</p>
+<p>Members have a separate preference for question emails. Members with a queued question receive no question reminder. The sender checks the schedule and queue again before sending.</p>
+<p>Question reminders have one outbox identity per member and question deadline. They expire when questions close. Schedule changes invalidate queued reminders for the previous window.</p>
 <h3 id="73-publication-and-delivery">7.3 Publication and delivery</h3>
 <ol>
 <li>Cron finds an issue whose deadline has passed.</li>
@@ -1015,9 +1047,9 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <p>HEIC files are not supported. Text and photo captions together have a ten KB limit per update. Failed uploads do not become valid photo references.</p>
 <h3 id="82-group-cover">8.2 Group cover</h3>
 <p>The owner or administrator can upload, crop, describe, save, replace, or remove a cover. The editor creates a 1200 by 600 JPEG. The server permits at most 192 KiB.</p>
-<p>D1 holds cover bytes. The group points to its current cover. A publication records the cover identity and description used at publication time.</p>
+<p>D1 holds cover bytes. The group points to its current cover and separate reminder image. A publication records the cover identity and description used at publication time.</p>
 <p>A later cover replacement does not change an earlier letter. Editing a saved crop permits further cropping. Restoring the original framing requires another upload of the original file.</p>
-<p>Unreferenced replaced covers become eligible for cleanup after seven days. Cover storage has an application limit of sixty-four MiB. Compact email image storage has a separate limit of 250 MiB.</p>
+<p>Unreferenced replaced covers become eligible for cleanup after seven days. Cover and reminder image storage share an application limit of sixty-four MiB. Compact email image storage has a separate limit of 250 MiB.</p>
 <h3 id="83-email-images-and-preview">8.3 Email images and preview</h3>
 <p>Email uses CID inline attachments. Image selection gives the cover priority, followed by contribution photos. The builder permits at most thirty-two attachments and twelve MiB of raw image bytes.</p>
 <p>A legacy photo without an email copy can use its prepared original. Photos beyond the attachment limit keep their captions and a private web link. Long emails use shorter text excerpts.</p>
@@ -1030,17 +1062,17 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <!-- Generated by graphviz version 12.1.2 (20240928.0832)
  -->
 <!-- Title: architecture Pages: 1 -->
-<svg width="924pt" height="363pt"
- viewBox="0.00 0.00 924.41 363.12" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(18 345.12)">
+<svg width="943pt" height="377pt"
+ viewBox="0.00 0.00 943.29 377.37" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(18 359.37)">
 <title>architecture</title>
-<polygon fill="#fffefd" stroke="none" points="-18,18 -18,-345.12 906.41,-345.12 906.41,18 -18,18"/>
+<polygon fill="#fffefd" stroke="none" points="-18,18 -18,-359.37 925.29,-359.37 925.29,18 -18,18"/>
 <!-- users -->
 <g id="node1" class="node">
 <title>users</title>
-<path fill="#f2edf6" stroke="#b5a0c0" d="M283.16,-327.12C283.16,-327.12 127.38,-327.12 127.38,-327.12 121.38,-327.12 115.37,-321.12 115.37,-315.12 115.37,-315.12 115.37,-293.34 115.37,-293.34 115.37,-287.34 121.37,-281.34 127.37,-281.34 127.37,-281.34 283.16,-281.34 283.16,-281.34 289.16,-281.34 295.16,-287.34 295.16,-293.34 295.16,-293.34 295.16,-315.12 295.16,-315.12 295.16,-321.12 289.16,-327.12 283.16,-327.12"/>
-<text text-anchor="middle" x="205.27" y="-307.08" font-family="Arial" font-size="12.00" fill="#302536">users</text>
-<text text-anchor="middle" x="205.27" y="-292.83" font-family="Arial" font-size="12.00" fill="#302536">Account + creation allowance</text>
+<path fill="#f2edf6" stroke="#b5a0c0" d="M283.16,-334.24C283.16,-334.24 127.38,-334.24 127.38,-334.24 121.38,-334.24 115.37,-328.24 115.37,-322.24 115.37,-322.24 115.37,-300.46 115.37,-300.46 115.37,-294.46 121.37,-288.46 127.37,-288.46 127.37,-288.46 283.16,-288.46 283.16,-288.46 289.16,-288.46 295.16,-294.46 295.16,-300.46 295.16,-300.46 295.16,-322.24 295.16,-322.24 295.16,-328.24 289.16,-334.24 283.16,-334.24"/>
+<text text-anchor="middle" x="205.27" y="-314.2" font-family="Arial" font-size="12.00" fill="#302536">users</text>
+<text text-anchor="middle" x="205.27" y="-299.95" font-family="Arial" font-size="12.00" fill="#302536">Account + creation allowance</text>
 </g>
 <!-- memberships -->
 <g id="node2" class="node">
@@ -1052,9 +1084,9 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <!-- users&#45;&gt;memberships -->
 <g id="edge1" class="edge">
 <title>users&#45;&gt;memberships</title>
-<path fill="none" stroke="#71507e" d="M226.33,-281.01C238.1,-268.59 252.9,-252.98 265.49,-239.7"/>
-<polygon fill="#71507e" stroke="#71507e" points="267.02,-241.65 270.06,-234.88 263.47,-238.27 267.02,-241.65"/>
-<text text-anchor="middle" x="273.1" y="-253.84" font-family="Arial" font-size="10.00" fill="#65596b">1 : many</text>
+<path fill="none" stroke="#71507e" d="M224.58,-288.4C237.11,-274.16 253.56,-255.46 267.11,-240.06"/>
+<polygon fill="#71507e" stroke="#71507e" points="268.93,-241.69 271.72,-234.82 265.25,-238.46 268.93,-241.69"/>
+<text text-anchor="middle" x="275.69" y="-253.84" font-family="Arial" font-size="10.00" fill="#65596b">1 : many</text>
 </g>
 <!-- contributions -->
 <g id="node7" class="node">
@@ -1066,37 +1098,38 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <!-- users&#45;&gt;contributions -->
 <g id="edge7" class="edge">
 <title>users&#45;&gt;contributions</title>
-<path fill="none" stroke="#71507e" d="M171.87,-280.89C156.48,-268.73 139.55,-252.29 130.02,-233.34 116.68,-206.82 114.45,-172.63 114.98,-148.32"/>
-<polygon fill="#71507e" stroke="#71507e" points="117.42,-148.43 115.23,-141.35 112.53,-148.26 117.42,-148.43"/>
+<path fill="none" stroke="#71507e" d="M175.32,-288.07C159.06,-274.22 140.25,-254.97 130.02,-233.34 117.33,-206.5 115,-172.36 115.33,-148.14"/>
+<polygon fill="#71507e" stroke="#71507e" points="117.78,-148.28 115.51,-141.22 112.88,-148.15 117.78,-148.28"/>
 <text text-anchor="middle" x="149.14" y="-206.95" font-family="Arial" font-size="10.00" fill="#65596b">1 : many</text>
 </g>
 <!-- groups -->
 <g id="node3" class="node">
 <title>groups</title>
-<path fill="#f2edf6" stroke="#b5a0c0" d="M606.16,-327.12C606.16,-327.12 474.38,-327.12 474.38,-327.12 468.38,-327.12 462.38,-321.12 462.38,-315.12 462.38,-315.12 462.38,-293.34 462.38,-293.34 462.38,-287.34 468.38,-281.34 474.38,-281.34 474.38,-281.34 606.16,-281.34 606.16,-281.34 612.16,-281.34 618.16,-287.34 618.16,-293.34 618.16,-293.34 618.16,-315.12 618.16,-315.12 618.16,-321.12 612.16,-327.12 606.16,-327.12"/>
-<text text-anchor="middle" x="540.27" y="-307.08" font-family="Arial" font-size="12.00" fill="#302536">groups</text>
-<text text-anchor="middle" x="540.27" y="-292.83" font-family="Arial" font-size="12.00" fill="#302536">Schedule + current cover</text>
+<path fill="#f2edf6" stroke="#b5a0c0" d="M623.79,-341.37C623.79,-341.37 456.75,-341.37 456.75,-341.37 450.75,-341.37 444.75,-335.37 444.75,-329.37 444.75,-329.37 444.75,-293.34 444.75,-293.34 444.75,-287.34 450.75,-281.34 456.75,-281.34 456.75,-281.34 623.79,-281.34 623.79,-281.34 629.79,-281.34 635.79,-287.34 635.79,-293.34 635.79,-293.34 635.79,-329.37 635.79,-329.37 635.79,-335.37 629.79,-341.37 623.79,-341.37"/>
+<text text-anchor="middle" x="540.27" y="-321.33" font-family="Arial" font-size="12.00" fill="#302536">groups</text>
+<text text-anchor="middle" x="540.27" y="-307.08" font-family="Arial" font-size="12.00" fill="#302536">Schedule + question policy</text>
+<text text-anchor="middle" x="540.27" y="-292.83" font-family="Arial" font-size="12.00" fill="#302536">Current cover + reminder image</text>
 </g>
 <!-- groups&#45;&gt;memberships -->
 <g id="edge2" class="edge">
 <title>groups&#45;&gt;memberships</title>
-<path fill="none" stroke="#71507e" d="M479.92,-280.9C443.78,-267.52 397.74,-250.48 360.31,-236.63"/>
-<polygon fill="#71507e" stroke="#71507e" points="361.3,-234.38 353.88,-234.25 359.59,-238.98 361.3,-234.38"/>
-<text text-anchor="middle" x="450.24" y="-253.84" font-family="Arial" font-size="10.00" fill="#65596b">1 : many</text>
+<path fill="none" stroke="#71507e" d="M466.53,-280.95C431.36,-266.92 389.68,-250.3 355.91,-236.83"/>
+<polygon fill="#71507e" stroke="#71507e" points="357.21,-234.71 349.8,-234.39 355.39,-239.26 357.21,-234.71"/>
+<text text-anchor="middle" x="435.39" y="-253.84" font-family="Arial" font-size="10.00" fill="#65596b">1 : many</text>
 </g>
 <!-- questions -->
 <g id="node4" class="node">
 <title>questions</title>
-<path fill="#f2edf6" stroke="#b5a0c0" d="M831.41,-233.34C831.41,-233.34 689.12,-233.34 689.12,-233.34 683.12,-233.34 677.12,-227.34 677.12,-221.34 677.12,-221.34 677.12,-199.56 677.12,-199.56 677.12,-193.56 683.12,-187.56 689.12,-187.56 689.12,-187.56 831.41,-187.56 831.41,-187.56 837.41,-187.56 843.41,-193.56 843.41,-199.56 843.41,-199.56 843.41,-221.34 843.41,-221.34 843.41,-227.34 837.41,-233.34 831.41,-233.34"/>
-<text text-anchor="middle" x="760.27" y="-213.3" font-family="Arial" font-size="12.00" fill="#302536">questions</text>
-<text text-anchor="middle" x="760.27" y="-199.05" font-family="Arial" font-size="12.00" fill="#302536">Suggestions + selected set</text>
+<path fill="#f2edf6" stroke="#b5a0c0" d="M895.29,-233.34C895.29,-233.34 689.25,-233.34 689.25,-233.34 683.25,-233.34 677.25,-227.34 677.25,-221.34 677.25,-221.34 677.25,-199.56 677.25,-199.56 677.25,-193.56 683.25,-187.56 689.25,-187.56 689.25,-187.56 895.29,-187.56 895.29,-187.56 901.29,-187.56 907.29,-193.56 907.29,-199.56 907.29,-199.56 907.29,-221.34 907.29,-221.34 907.29,-227.34 901.29,-233.34 895.29,-233.34"/>
+<text text-anchor="middle" x="792.27" y="-213.3" font-family="Arial" font-size="12.00" fill="#302536">questions</text>
+<text text-anchor="middle" x="792.27" y="-199.05" font-family="Arial" font-size="12.00" fill="#302536">Pending member queue + used marker</text>
 </g>
 <!-- groups&#45;&gt;questions -->
 <g id="edge3" class="edge">
 <title>groups&#45;&gt;questions</title>
-<path fill="none" stroke="#71507e" d="M593.81,-280.9C625.6,-267.63 666.02,-250.77 699.08,-236.98"/>
-<polygon fill="#71507e" stroke="#71507e" points="699.96,-239.26 705.48,-234.31 698.07,-234.74 699.96,-239.26"/>
-<text text-anchor="middle" x="682.57" y="-253.84" font-family="Arial" font-size="10.00" fill="#65596b">1 : many</text>
+<path fill="none" stroke="#71507e" d="M615.2,-280.95C650.94,-266.92 693.28,-250.3 727.6,-236.83"/>
+<polygon fill="#71507e" stroke="#71507e" points="728.21,-239.22 733.83,-234.38 726.42,-234.66 728.21,-239.22"/>
+<text text-anchor="middle" x="707.97" y="-253.84" font-family="Arial" font-size="10.00" fill="#65596b">1 : many</text>
 </g>
 <!-- issues -->
 <g id="node5" class="node">
@@ -1108,23 +1141,23 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <!-- groups&#45;&gt;issues -->
 <g id="edge4" class="edge">
 <title>groups&#45;&gt;issues</title>
-<path fill="none" stroke="#71507e" d="M540.27,-281.01C540.27,-269.37 540.27,-254.94 540.27,-242.24"/>
-<polygon fill="#71507e" stroke="#71507e" points="542.72,-242.29 540.27,-235.29 537.82,-242.29 542.72,-242.29"/>
+<path fill="none" stroke="#71507e" d="M540.27,-280.95C540.27,-268.64 540.27,-254.34 540.27,-241.92"/>
+<polygon fill="#71507e" stroke="#71507e" points="542.72,-242.19 540.27,-235.19 537.82,-242.19 542.72,-242.19"/>
 <text text-anchor="middle" x="559.39" y="-253.84" font-family="Arial" font-size="10.00" fill="#65596b">1 : many</text>
 </g>
 <!-- iq -->
 <g id="node6" class="node">
 <title>iq</title>
-<path fill="#f2edf6" stroke="#b5a0c0" d="M648.66,-139.56C648.66,-139.56 501.88,-139.56 501.88,-139.56 495.88,-139.56 489.88,-133.56 489.88,-127.56 489.88,-127.56 489.88,-105.78 489.88,-105.78 489.88,-99.78 495.88,-93.78 501.88,-93.78 501.88,-93.78 648.66,-93.78 648.66,-93.78 654.66,-93.78 660.66,-99.78 660.66,-105.78 660.66,-105.78 660.66,-127.56 660.66,-127.56 660.66,-133.56 654.66,-139.56 648.66,-139.56"/>
-<text text-anchor="middle" x="575.27" y="-119.52" font-family="Arial" font-size="12.00" fill="#302536">issue_questions</text>
-<text text-anchor="middle" x="575.27" y="-105.27" font-family="Arial" font-size="12.00" fill="#302536">Question copy for one issue</text>
+<path fill="#f2edf6" stroke="#b5a0c0" d="M658.16,-139.56C658.16,-139.56 502.38,-139.56 502.38,-139.56 496.38,-139.56 490.38,-133.56 490.38,-127.56 490.38,-127.56 490.38,-105.78 490.38,-105.78 490.38,-99.78 496.38,-93.78 502.38,-93.78 502.38,-93.78 658.16,-93.78 658.16,-93.78 664.16,-93.78 670.16,-99.78 670.16,-105.78 670.16,-105.78 670.16,-127.56 670.16,-127.56 670.16,-133.56 664.16,-139.56 658.16,-139.56"/>
+<text text-anchor="middle" x="580.27" y="-119.52" font-family="Arial" font-size="12.00" fill="#302536">issue_questions</text>
+<text text-anchor="middle" x="580.27" y="-105.27" font-family="Arial" font-size="12.00" fill="#302536">Question copy + bank identity</text>
 </g>
 <!-- issues&#45;&gt;iq -->
 <g id="edge5" class="edge">
 <title>issues&#45;&gt;iq</title>
-<path fill="none" stroke="#71507e" d="M548.74,-187.23C553.27,-175.37 558.9,-160.6 563.81,-147.73"/>
-<polygon fill="#71507e" stroke="#71507e" points="566.01,-148.83 566.21,-141.42 561.43,-147.08 566.01,-148.83"/>
-<text text-anchor="middle" x="578.99" y="-160.06" font-family="Arial" font-size="10.00" fill="#65596b">1 : many</text>
+<path fill="none" stroke="#71507e" d="M549.95,-187.23C555.12,-175.37 561.56,-160.6 567.17,-147.73"/>
+<polygon fill="#71507e" stroke="#71507e" points="569.38,-148.78 569.93,-141.39 564.89,-146.83 569.38,-148.78"/>
+<text text-anchor="middle" x="581.79" y="-160.06" font-family="Arial" font-size="10.00" fill="#65596b">1 : many</text>
 </g>
 <!-- issues&#45;&gt;contributions -->
 <g id="edge6" class="edge">
@@ -1136,16 +1169,16 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <!-- publications -->
 <g id="node8" class="node">
 <title>publications</title>
-<path fill="#f2edf6" stroke="#b5a0c0" d="M876.41,-139.56C876.41,-139.56 698.12,-139.56 698.12,-139.56 692.12,-139.56 686.12,-133.56 686.12,-127.56 686.12,-127.56 686.12,-105.78 686.12,-105.78 686.12,-99.78 692.12,-93.78 698.12,-93.78 698.12,-93.78 876.41,-93.78 876.41,-93.78 882.41,-93.78 888.41,-99.78 888.41,-105.78 888.41,-105.78 888.41,-127.56 888.41,-127.56 888.41,-133.56 882.41,-139.56 876.41,-139.56"/>
-<text text-anchor="middle" x="787.27" y="-119.52" font-family="Arial" font-size="12.00" fill="#302536">publications</text>
-<text text-anchor="middle" x="787.27" y="-105.27" font-family="Arial" font-size="12.00" fill="#302536">Published content + cover identity</text>
+<path fill="#f2edf6" stroke="#b5a0c0" d="M885.41,-139.56C885.41,-139.56 707.12,-139.56 707.12,-139.56 701.12,-139.56 695.12,-133.56 695.12,-127.56 695.12,-127.56 695.12,-105.78 695.12,-105.78 695.12,-99.78 701.12,-93.78 707.12,-93.78 707.12,-93.78 885.41,-93.78 885.41,-93.78 891.41,-93.78 897.41,-99.78 897.41,-105.78 897.41,-105.78 897.41,-127.56 897.41,-127.56 897.41,-133.56 891.41,-139.56 885.41,-139.56"/>
+<text text-anchor="middle" x="796.27" y="-119.52" font-family="Arial" font-size="12.00" fill="#302536">publications</text>
+<text text-anchor="middle" x="796.27" y="-105.27" font-family="Arial" font-size="12.00" fill="#302536">Published content + cover identity</text>
 </g>
 <!-- issues&#45;&gt;publications -->
 <g id="edge8" class="edge">
 <title>issues&#45;&gt;publications</title>
-<path fill="none" stroke="#71507e" d="M600.38,-187.12C636.37,-173.74 682.22,-156.7 719.5,-142.85"/>
-<polygon fill="#71507e" stroke="#71507e" points="720.19,-145.21 725.9,-140.47 718.49,-140.61 720.19,-145.21"/>
-<text text-anchor="middle" x="693.93" y="-160.06" font-family="Arial" font-size="10.00" fill="#65596b">1 : 0..1</text>
+<path fill="none" stroke="#71507e" d="M602.57,-187.12C640.03,-173.68 687.79,-156.56 726.52,-142.68"/>
+<polygon fill="#71507e" stroke="#71507e" points="726.95,-145.12 732.71,-140.46 725.3,-140.51 726.95,-145.12"/>
+<text text-anchor="middle" x="698.97" y="-160.06" font-family="Arial" font-size="10.00" fill="#65596b">1 : 0..1</text>
 </g>
 <!-- outbox -->
 <g id="node10" class="node">
@@ -1188,7 +1221,7 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <p>Account deletion revokes access and invalidates affected exports. Publication reads apply deletion redaction immediately. Background cleanup then applies the changes to stored publications and objects.</p>
 <p>Group deletion pauses the group, closes access, cancels pending issues, and skips queued mail. Bounded cleanup removes its content and private objects. Deletion does not recall email copies already delivered.</p>
 <h3 id="92-profile-preferences-sessions-and-email-changes">9.2 Profile, preferences, sessions, and email changes</h3>
-<p>A member can change the profile name. Each membership has separate preferences for opening, reminder, and publication email. Disabling a preference does not remove web access.</p>
+<p>A member can change the profile name. Each membership has separate preferences for opening, submission reminder, question reminder, and publication email. Disabling a preference does not remove web access.</p>
 <p>The account screen lists active sessions. The member can revoke one session or other sessions. Logout removes the current session and local recovery copies.</p>
 <p>An email change requires an unused, verified, eligible destination address. An unverified address needs host confirmation before the member requests the change again. The current address remains active during this process.</p>
 <p>The member confirms the change with a temporary token while signed in. Confirmation changes the address and revokes other sessions and unused sign-in tokens. Queued group messages use the new address.</p>
@@ -1199,138 +1232,157 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <!-- Generated by graphviz version 12.1.2 (20240928.0832)
  -->
 <!-- Title: architecture Pages: 1 -->
-<svg width="482pt" height="635pt"
- viewBox="0.00 0.00 482.41 634.68" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(18 616.68)">
+<svg width="533pt" height="716pt"
+ viewBox="0.00 0.00 533.41 716.46" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(18 698.46)">
 <title>architecture</title>
-<polygon fill="#fffefd" stroke="none" points="-18,18 -18,-616.68 464.41,-616.68 464.41,18 -18,18"/>
+<polygon fill="#fffefd" stroke="none" points="-18,18 -18,-698.46 515.41,-698.46 515.41,18 -18,18"/>
 <!-- tick -->
 <g id="node1" class="node">
 <title>tick</title>
-<path fill="#f2edf6" stroke="#b5a0c0" d="M381.54,-598.68C381.54,-598.68 335.25,-598.68 335.25,-598.68 329.25,-598.68 323.25,-592.68 323.25,-586.68 323.25,-586.68 323.25,-574.68 323.25,-574.68 323.25,-568.68 329.25,-562.68 335.25,-562.68 335.25,-562.68 381.54,-562.68 381.54,-562.68 387.54,-562.68 393.54,-568.68 393.54,-574.68 393.54,-574.68 393.54,-586.68 393.54,-586.68 393.54,-592.68 387.54,-598.68 381.54,-598.68"/>
-<text text-anchor="middle" x="358.39" y="-576.4" font-family="Arial" font-size="12.00" fill="#302536">Cron tick</text>
+<path fill="#f2edf6" stroke="#b5a0c0" d="M432.54,-680.46C432.54,-680.46 386.25,-680.46 386.25,-680.46 380.25,-680.46 374.25,-674.46 374.25,-668.46 374.25,-668.46 374.25,-656.46 374.25,-656.46 374.25,-650.46 380.25,-644.46 386.25,-644.46 386.25,-644.46 432.54,-644.46 432.54,-644.46 438.54,-644.46 444.54,-650.46 444.54,-656.46 444.54,-656.46 444.54,-668.46 444.54,-668.46 444.54,-674.46 438.54,-680.46 432.54,-680.46"/>
+<text text-anchor="middle" x="409.39" y="-658.18" font-family="Arial" font-size="12.00" fill="#302536">Cron tick</text>
 </g>
 <!-- schedule -->
 <g id="node2" class="node">
 <title>schedule</title>
-<path fill="#f2edf6" stroke="#b5a0c0" d="M434.41,-526.68C434.41,-526.68 282.38,-526.68 282.38,-526.68 276.38,-526.68 270.38,-520.68 270.38,-514.68 270.38,-514.68 270.38,-492.9 270.38,-492.9 270.38,-486.9 276.38,-480.9 282.38,-480.9 282.38,-480.9 434.41,-480.9 434.41,-480.9 440.41,-480.9 446.41,-486.9 446.41,-492.9 446.41,-492.9 446.41,-514.68 446.41,-514.68 446.41,-520.68 440.41,-526.68 434.41,-526.68"/>
-<text text-anchor="middle" x="358.39" y="-506.64" font-family="Arial" font-size="12.00" fill="#302536">Schedule</text>
-<text text-anchor="middle" x="358.39" y="-492.39" font-family="Arial" font-size="12.00" fill="#302536">One bounded state transition</text>
+<path fill="#f2edf6" stroke="#b5a0c0" d="M485.41,-608.46C485.41,-608.46 333.38,-608.46 333.38,-608.46 327.38,-608.46 321.38,-602.46 321.38,-596.46 321.38,-596.46 321.38,-574.68 321.38,-574.68 321.38,-568.68 327.38,-562.68 333.38,-562.68 333.38,-562.68 485.41,-562.68 485.41,-562.68 491.41,-562.68 497.41,-568.68 497.41,-574.68 497.41,-574.68 497.41,-596.46 497.41,-596.46 497.41,-602.46 491.41,-608.46 485.41,-608.46"/>
+<text text-anchor="middle" x="409.39" y="-588.42" font-family="Arial" font-size="12.00" fill="#302536">Schedule</text>
+<text text-anchor="middle" x="409.39" y="-574.17" font-family="Arial" font-size="12.00" fill="#302536">One bounded state transition</text>
 </g>
 <!-- tick&#45;&gt;schedule -->
 <g id="edge1" class="edge">
 <title>tick&#45;&gt;schedule</title>
-<path fill="none" stroke="#71507e" d="M358.39,-562.31C358.39,-554.24 358.39,-544.4 358.39,-535.16"/>
-<polygon fill="#71507e" stroke="#71507e" points="360.85,-535.42 358.4,-528.42 355.95,-535.42 360.85,-535.42"/>
+<path fill="none" stroke="#71507e" d="M409.39,-644.09C409.39,-636.02 409.39,-626.18 409.39,-616.94"/>
+<polygon fill="#71507e" stroke="#71507e" points="411.85,-617.2 409.4,-610.2 406.95,-617.2 411.85,-617.2"/>
 </g>
 <!-- signup -->
 <g id="node3" class="node">
 <title>signup</title>
-<path fill="#f2edf6" stroke="#b5a0c0" d="M377.04,-444.9C377.04,-444.9 201.75,-444.9 201.75,-444.9 195.75,-444.9 189.75,-438.9 189.75,-432.9 189.75,-432.9 189.75,-411.12 189.75,-411.12 189.75,-405.12 195.75,-399.12 201.75,-399.12 201.75,-399.12 377.04,-399.12 377.04,-399.12 383.04,-399.12 389.04,-405.12 389.04,-411.12 389.04,-411.12 389.04,-432.9 389.04,-432.9 389.04,-438.9 383.04,-444.9 377.04,-444.9"/>
-<text text-anchor="middle" x="289.39" y="-424.86" font-family="Arial" font-size="12.00" fill="#302536">Signup</text>
-<text text-anchor="middle" x="289.39" y="-410.61" font-family="Arial" font-size="12.00" fill="#302536">Advance one pending enrollment</text>
+<path fill="#f2edf6" stroke="#b5a0c0" d="M428.04,-526.68C428.04,-526.68 252.75,-526.68 252.75,-526.68 246.75,-526.68 240.75,-520.68 240.75,-514.68 240.75,-514.68 240.75,-492.9 240.75,-492.9 240.75,-486.9 246.75,-480.9 252.75,-480.9 252.75,-480.9 428.04,-480.9 428.04,-480.9 434.04,-480.9 440.04,-486.9 440.04,-492.9 440.04,-492.9 440.04,-514.68 440.04,-514.68 440.04,-520.68 434.04,-526.68 428.04,-526.68"/>
+<text text-anchor="middle" x="340.39" y="-506.64" font-family="Arial" font-size="12.00" fill="#302536">Signup</text>
+<text text-anchor="middle" x="340.39" y="-492.39" font-family="Arial" font-size="12.00" fill="#302536">Advance one pending enrollment</text>
 </g>
 <!-- schedule&#45;&gt;signup -->
 <g id="edge2" class="edge">
 <title>schedule&#45;&gt;signup</title>
-<path fill="none" stroke="#71507e" d="M339.17,-480.57C331.46,-471.65 322.48,-461.26 314.28,-451.78"/>
-<polygon fill="#71507e" stroke="#71507e" points="316.17,-450.23 309.74,-446.54 312.47,-453.43 316.17,-450.23"/>
+<path fill="none" stroke="#71507e" d="M390.17,-562.35C382.46,-553.43 373.48,-543.04 365.28,-533.56"/>
+<polygon fill="#71507e" stroke="#71507e" points="367.17,-532.01 360.74,-528.32 363.47,-535.21 367.17,-532.01"/>
 </g>
 <!-- health -->
-<g id="node7" class="node">
+<g id="node8" class="node">
 <title>health</title>
-<path fill="#f2edf6" stroke="#b5a0c0" d="M391.29,-117.78C391.29,-117.78 259.5,-117.78 259.5,-117.78 253.5,-117.78 247.5,-111.78 247.5,-105.78 247.5,-105.78 247.5,-84 247.5,-84 247.5,-78 253.5,-72 259.5,-72 259.5,-72 391.29,-72 391.29,-72 397.29,-72 403.29,-78 403.29,-84 403.29,-84 403.29,-105.78 403.29,-105.78 403.29,-111.78 397.29,-117.78 391.29,-117.78"/>
-<text text-anchor="middle" x="325.39" y="-97.74" font-family="Arial" font-size="12.00" fill="#302536">D1 service_state</text>
-<text text-anchor="middle" x="325.39" y="-83.49" font-family="Arial" font-size="12.00" fill="#302536">Record each stage result</text>
+<path fill="#f2edf6" stroke="#b5a0c0" d="M416.29,-117.78C416.29,-117.78 284.5,-117.78 284.5,-117.78 278.5,-117.78 272.5,-111.78 272.5,-105.78 272.5,-105.78 272.5,-84 272.5,-84 272.5,-78 278.5,-72 284.5,-72 284.5,-72 416.29,-72 416.29,-72 422.29,-72 428.29,-78 428.29,-84 428.29,-84 428.29,-105.78 428.29,-105.78 428.29,-111.78 422.29,-117.78 416.29,-117.78"/>
+<text text-anchor="middle" x="350.39" y="-97.74" font-family="Arial" font-size="12.00" fill="#302536">D1 service_state</text>
+<text text-anchor="middle" x="350.39" y="-83.49" font-family="Arial" font-size="12.00" fill="#302536">Record each stage result</text>
 </g>
 <!-- schedule&#45;&gt;health -->
-<g id="edge6" class="edge">
+<g id="edge7" class="edge">
 <title>schedule&#45;&gt;health</title>
-<path fill="none" stroke="#71507e" stroke-dasharray="5,2" d="M378.21,-480.48C386.41,-470.24 395.39,-457.57 401.39,-444.9 421.73,-401.97 427.39,-388.73 427.39,-341.23 427.39,-341.23 427.39,-341.23 427.39,-257.45 427.39,-203.96 386.93,-153.76 356.97,-123.92"/>
-<polygon fill="#71507e" stroke="#71507e" points="358.94,-122.42 352.22,-119.29 355.52,-125.93 358.94,-122.42"/>
+<path fill="none" stroke="#71507e" stroke-dasharray="5,2" d="M429.21,-562.26C437.41,-552.02 446.39,-539.35 452.39,-526.68 472.73,-483.75 478.39,-470.51 478.39,-423.01 478.39,-423.01 478.39,-423.01 478.39,-257.45 478.39,-200.28 428.55,-151.55 391.07,-122.98"/>
+<polygon fill="#71507e" stroke="#71507e" points="392.99,-121.36 385.91,-119.14 390.05,-125.29 392.99,-121.36"/>
+</g>
+<!-- questions -->
+<g id="node4" class="node">
+<title>questions</title>
+<path fill="#f2edf6" stroke="#b5a0c0" d="M377.54,-444.9C377.54,-444.9 169.25,-444.9 169.25,-444.9 163.25,-444.9 157.25,-438.9 157.25,-432.9 157.25,-432.9 157.25,-411.12 157.25,-411.12 157.25,-405.12 163.25,-399.12 169.25,-399.12 169.25,-399.12 377.54,-399.12 377.54,-399.12 383.54,-399.12 389.54,-405.12 389.54,-411.12 389.54,-411.12 389.54,-432.9 389.54,-432.9 389.54,-438.9 383.54,-444.9 377.54,-444.9"/>
+<text text-anchor="middle" x="273.39" y="-424.86" font-family="Arial" font-size="12.00" fill="#302536">Questions</text>
+<text text-anchor="middle" x="273.39" y="-410.61" font-family="Arial" font-size="12.00" fill="#302536">Queue reminders before question cutoff</text>
+</g>
+<!-- signup&#45;&gt;questions -->
+<g id="edge3" class="edge">
+<title>signup&#45;&gt;questions</title>
+<path fill="none" stroke="#71507e" d="M321.73,-480.57C314.24,-471.65 305.52,-461.26 297.56,-451.78"/>
+<polygon fill="#71507e" stroke="#71507e" points="299.54,-450.33 293.16,-446.55 295.79,-453.49 299.54,-450.33"/>
+</g>
+<!-- signup&#45;&gt;health -->
+<g id="edge8" class="edge">
+<title>signup&#45;&gt;health</title>
+<path fill="none" stroke="#71507e" stroke-dasharray="5,2" d="M370.89,-480.62C382.32,-470.86 394.45,-458.51 402.39,-444.9 426.28,-403.96 427.39,-388.63 427.39,-341.23 427.39,-341.23 427.39,-341.23 427.39,-257.45 427.39,-207.04 396.47,-155.64 373.82,-124.75"/>
+<polygon fill="#71507e" stroke="#71507e" points="375.9,-123.45 369.75,-119.31 371.98,-126.38 375.9,-123.45"/>
 </g>
 <!-- mail -->
-<g id="node4" class="node">
+<g id="node5" class="node">
 <title>mail</title>
 <path fill="#f2edf6" stroke="#b5a0c0" d="M326.79,-363.12C326.79,-363.12 132,-363.12 132,-363.12 126,-363.12 120,-357.12 120,-351.12 120,-351.12 120,-329.34 120,-329.34 120,-323.34 126,-317.34 132,-317.34 132,-317.34 326.79,-317.34 326.79,-317.34 332.79,-317.34 338.79,-323.34 338.79,-329.34 338.79,-329.34 338.79,-351.12 338.79,-351.12 338.79,-357.12 332.79,-363.12 326.79,-363.12"/>
 <text text-anchor="middle" x="229.39" y="-343.08" font-family="Arial" font-size="12.00" fill="#302536">Mail</text>
 <text text-anchor="middle" x="229.39" y="-328.83" font-family="Arial" font-size="12.00" fill="#302536">Claim at most two queued messages</text>
 </g>
-<!-- signup&#45;&gt;mail -->
-<g id="edge3" class="edge">
-<title>signup&#45;&gt;mail</title>
-<path fill="none" stroke="#71507e" d="M272.68,-398.79C266.04,-389.96 258.31,-379.68 251.24,-370.27"/>
-<polygon fill="#71507e" stroke="#71507e" points="253.3,-368.94 247.14,-364.82 249.39,-371.89 253.3,-368.94"/>
+<!-- questions&#45;&gt;mail -->
+<g id="edge4" class="edge">
+<title>questions&#45;&gt;mail</title>
+<path fill="none" stroke="#71507e" d="M261.14,-398.79C256.36,-390.13 250.82,-380.08 245.72,-370.82"/>
+<polygon fill="#71507e" stroke="#71507e" points="248,-369.88 242.47,-364.94 243.7,-372.25 248,-369.88"/>
 </g>
-<!-- signup&#45;&gt;health -->
-<g id="edge7" class="edge">
-<title>signup&#45;&gt;health</title>
-<path fill="none" stroke="#71507e" stroke-dasharray="5,2" d="M322.56,-398.88C333.92,-389.36 345.29,-377.17 351.39,-363.12 386.21,-282.97 356.09,-176.9 337.47,-125.86"/>
-<polygon fill="#71507e" stroke="#71507e" points="339.87,-125.27 335.12,-119.57 335.28,-126.98 339.87,-125.27"/>
+<!-- questions&#45;&gt;health -->
+<g id="edge9" class="edge">
+<title>questions&#45;&gt;health</title>
+<path fill="none" stroke="#71507e" stroke-dasharray="5,2" d="M317.06,-398.79C330.46,-389.66 343.7,-377.74 351.39,-363.12 392.03,-285.92 372.43,-177.96 359.16,-126.07"/>
+<polygon fill="#71507e" stroke="#71507e" points="361.56,-125.55 357.4,-119.41 356.82,-126.8 361.56,-125.55"/>
 </g>
 <!-- exports -->
-<g id="node5" class="node">
+<g id="node6" class="node">
 <title>exports</title>
 <path fill="#f2edf6" stroke="#b5a0c0" d="M274.91,-281.34C274.91,-281.34 107.88,-281.34 107.88,-281.34 101.88,-281.34 95.87,-275.34 95.87,-269.34 95.87,-269.34 95.87,-247.56 95.87,-247.56 95.87,-241.56 101.87,-235.56 107.87,-235.56 107.87,-235.56 274.91,-235.56 274.91,-235.56 280.91,-235.56 286.91,-241.56 286.91,-247.56 286.91,-247.56 286.91,-269.34 286.91,-269.34 286.91,-275.34 280.91,-281.34 274.91,-281.34"/>
 <text text-anchor="middle" x="191.39" y="-261.3" font-family="Arial" font-size="12.00" fill="#302536">Exports</text>
 <text text-anchor="middle" x="191.39" y="-247.05" font-family="Arial" font-size="12.00" fill="#302536">Advance bounded archive work</text>
 </g>
 <!-- mail&#45;&gt;exports -->
-<g id="edge4" class="edge">
+<g id="edge5" class="edge">
 <title>mail&#45;&gt;exports</title>
 <path fill="none" stroke="#71507e" d="M218.81,-317.01C214.73,-308.43 209.99,-298.5 205.62,-289.32"/>
 <polygon fill="#71507e" stroke="#71507e" points="207.93,-288.46 202.71,-283.2 203.5,-290.57 207.93,-288.46"/>
 </g>
 <!-- mail&#45;&gt;health -->
-<g id="edge8" class="edge">
+<g id="edge10" class="edge">
 <title>mail&#45;&gt;health</title>
-<path fill="none" stroke="#71507e" stroke-dasharray="5,2" d="M266.03,-317.11C278.59,-307.66 291.47,-295.52 299.39,-281.34 326.82,-232.26 329.06,-164.87 327.62,-126.3"/>
-<polygon fill="#71507e" stroke="#71507e" points="330.08,-126.46 327.31,-119.58 325.19,-126.68 330.08,-126.46"/>
+<path fill="none" stroke="#71507e" stroke-dasharray="5,2" d="M264.34,-317.08C277.01,-307.48 290.4,-295.24 299.39,-281.34 330.75,-232.86 343.02,-165.26 347.68,-126.49"/>
+<polygon fill="#71507e" stroke="#71507e" points="350.09,-126.94 348.44,-119.71 345.22,-126.39 350.09,-126.94"/>
 </g>
 <!-- cleanup -->
-<g id="node6" class="node">
+<g id="node7" class="node">
 <title>cleanup</title>
 <path fill="#f2edf6" stroke="#b5a0c0" d="M224.79,-199.56C224.79,-199.56 12,-199.56 12,-199.56 6,-199.56 0,-193.56 0,-187.56 0,-187.56 0,-165.78 0,-165.78 0,-159.78 6,-153.78 12,-153.78 12,-153.78 224.79,-153.78 224.79,-153.78 230.79,-153.78 236.79,-159.78 236.79,-165.78 236.79,-165.78 236.79,-187.56 236.79,-187.56 236.79,-193.56 230.79,-199.56 224.79,-199.56"/>
 <text text-anchor="middle" x="118.39" y="-179.52" font-family="Arial" font-size="12.00" fill="#302536">Cleanup</text>
 <text text-anchor="middle" x="118.39" y="-165.27" font-family="Arial" font-size="12.00" fill="#302536">Expire records + remove unused objects</text>
 </g>
 <!-- exports&#45;&gt;cleanup -->
-<g id="edge5" class="edge">
+<g id="edge6" class="edge">
 <title>exports&#45;&gt;cleanup</title>
 <path fill="none" stroke="#71507e" d="M171.06,-235.23C162.82,-226.23 153.21,-215.72 144.47,-206.17"/>
 <polygon fill="#71507e" stroke="#71507e" points="146.43,-204.68 139.9,-201.17 142.81,-207.99 146.43,-204.68"/>
 </g>
 <!-- exports&#45;&gt;health -->
-<g id="edge9" class="edge">
+<g id="edge11" class="edge">
 <title>exports&#45;&gt;health</title>
-<path fill="none" stroke="#71507e" stroke-dasharray="5,2" d="M215.38,-235.13C226.17,-224.69 238.83,-211.87 249.39,-199.56 270.03,-175.52 291.15,-146.27 305.87,-124.97"/>
-<polygon fill="#71507e" stroke="#71507e" points="307.81,-126.48 309.75,-119.32 303.77,-123.71 307.81,-126.48"/>
+<path fill="none" stroke="#71507e" stroke-dasharray="5,2" d="M213.78,-235.26C224.58,-224.51 237.7,-211.4 249.39,-199.56 274.47,-174.18 302.8,-145.06 323.06,-124.16"/>
+<polygon fill="#71507e" stroke="#71507e" points="324.65,-126.04 327.76,-119.31 321.13,-122.63 324.65,-126.04"/>
 </g>
 <!-- cleanup&#45;&gt;health -->
-<g id="edge10" class="edge">
+<g id="edge12" class="edge">
 <title>cleanup&#45;&gt;health</title>
-<path fill="none" stroke="#71507e" stroke-dasharray="5,2" d="M176.33,-153.34C202.24,-143.36 232.91,-131.54 259.67,-121.22"/>
-<polygon fill="#71507e" stroke="#71507e" points="260.41,-123.56 266.06,-118.76 258.65,-118.99 260.41,-123.56"/>
+<path fill="none" stroke="#71507e" stroke-dasharray="5,2" d="M183.33,-153.34C212.62,-143.27 247.33,-131.33 277.5,-120.96"/>
+<polygon fill="#71507e" stroke="#71507e" points="278.22,-123.3 284.05,-118.71 276.63,-118.67 278.22,-123.3"/>
 </g>
 <!-- note -->
-<g id="node8" class="node">
+<g id="node9" class="node">
 <title>note</title>
-<polygon fill="#f2edf6" stroke="#b5a0c0" points="436.29,-36 208.5,-36 208.5,0 442.29,0 442.29,-30 436.29,-36"/>
-<polyline fill="none" stroke="#b5a0c0" points="436.29,-36 436.29,-30"/>
-<polyline fill="none" stroke="#b5a0c0" points="442.29,-30 436.29,-30"/>
-<text text-anchor="middle" x="325.39" y="-13.72" font-family="Arial" font-size="12.00" fill="#302536">A failed stage does not stop later stages</text>
+<polygon fill="#f2edf6" stroke="#b5a0c0" points="461.29,-36 233.5,-36 233.5,0 467.29,0 467.29,-30 461.29,-36"/>
+<polyline fill="none" stroke="#b5a0c0" points="461.29,-36 461.29,-30"/>
+<polyline fill="none" stroke="#b5a0c0" points="467.29,-30 461.29,-30"/>
+<text text-anchor="middle" x="350.39" y="-13.72" font-family="Arial" font-size="12.00" fill="#302536">A failed stage does not stop later stages</text>
 </g>
 <!-- health&#45;&gt;note -->
-<g id="edge11" class="edge">
+<g id="edge13" class="edge">
 <title>health&#45;&gt;note</title>
-<path fill="none" stroke="#71507e" stroke-dasharray="5,2" d="M325.39,-71.83C325.39,-63.28 325.39,-53.45 325.39,-44.6"/>
-<polygon fill="#71507e" stroke="#71507e" points="327.85,-44.67 325.4,-37.67 322.95,-44.67 327.85,-44.67"/>
+<path fill="none" stroke="#71507e" stroke-dasharray="5,2" d="M350.39,-71.83C350.39,-63.28 350.39,-53.45 350.39,-44.6"/>
+<polygon fill="#71507e" stroke="#71507e" points="352.85,-44.67 350.4,-37.67 347.95,-44.67 352.85,-44.67"/>
 </g>
 </g>
 </svg>
 <figcaption>Scheduled work and recovery</figcaption></figure></p>
 <p>Cron runs schedule, signup, mail, exports, and cleanup in that order. Each stage has an independent error boundary. A failed cleanup stage does not stop that tick's earlier email work.</p>
-<p>The scheduler advances one bounded task per call. Its priority is closure, opening, opening notice, reminder, then planning. Other groups can wait for a later tick.</p>
+<p>The scheduler advances one bounded task per call. Its priority is closure, opening, opening notice, submission reminder, then planning. A separate stage queues question reminders for eligible groups. Other groups can wait for a later tick.</p>
 <p>Each stage records status and time in <code>service_state</code>. Operator screens show delivery failures, queue age, and backup summaries. These records need an operator to inspect them.</p>
 <h3 id="101-outbox-states">10.1 Outbox states</h3>
 <table>
@@ -1415,6 +1467,10 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <td><code>tests/schedule.test.ts</code></td>
 </tr>
 <tr>
+<td>Question rotation, use-once member questions, and cutoff</td>
+<td><code>tests/question-cycles.test.ts</code>, <code>tests/question-migration.test.mjs</code></td>
+</tr>
+<tr>
 <td>Reminders, isolation, and independent stages</td>
 <td><code>tests/repair-policy.test.ts</code>, <code>tests/operations.test.ts</code></td>
 </tr>
@@ -1441,7 +1497,7 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 </tbody>
 </table>
 <p>CI installs the pinned Node version and runs format checks, type checks, backend tests, a production build, and browser tests. It retains browser evidence for fourteen days.</p>
-<p>The source baseline has eighty-eight backend cases and ten browser cases. These counts describe that baseline. They do not replace inspection of the current CI result.</p>
+<p>The source baseline has ninety-four backend cases and eleven browser cases. These counts describe that baseline. They do not replace inspection of the current CI result.</p>
 <h2 id="13-limits-and-extension-points">13. Limits and extension points</h2>
 <table>
 <thead>
@@ -1464,8 +1520,8 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <td>Simultaneous deadlines can delay later groups.</td>
 </tr>
 <tr>
-<td>No automatic question rotation</td>
-<td>The host selects the next question set from member suggestions and starter questions.</td>
+<td>Question limits</td>
+<td>Each issue has at most ten questions. The bank contributes zero to five questions. Pending member questions fill the remaining places.</td>
 </tr>
 <tr>
 <td>No comments or reactions</td>
@@ -1586,4 +1642,4 @@ Source baseline: <code>5ecfb589490c9654a14c10a50f06f5bee025107e</code></p>
 <li><a href="https://github.com/bassimeledath/betterloop/blob/main/docs/EMAIL_PHOTOS.md">Cover and email photos</a>: image limits, privacy, and preview behavior.</li>
 <li><a href="https://github.com/bassimeledath/betterloop">Public source repository</a>: code and CI history.</li>
 </ul>
-<p>Update this document when a supported flow, role, state, storage location, or limit changes. Keep diagrams and text consistent. The editable diagram sources are in <code>docs/architecture/*.dot</code>.</p></main></html>
+<p>Update this document when a supported flow, role, state, storage location, or limit changes. Keep diagrams and text consistent. Question policy and reminder regression tests are in <code>tests/question-cycles.test.ts</code> and <code>tests/question-migration.test.mjs</code>. The editable diagram sources are in <code>docs/architecture/*.dot</code>.</p></main></html>

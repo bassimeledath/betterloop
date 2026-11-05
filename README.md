@@ -35,7 +35,7 @@ npm run test:e2e
 
 Vitest executes Worker routes against isolated workerd/D1/R2 bindings. Playwright drives Chromium through the real React frontend and routes API requests into those isolated bindings. Browser fixtures use synthetic people and images, capture email, and require no Cloudflare credentials. They do not call production.
 
-CI runs these checks on pushes and pull requests. It uploads browser traces and screenshots for 14 days. Regressions cover offline draft recovery, ambiguous saves, scheduling isolation, reminders and mobile layout. CI contains no expected-failure annotations.
+CI runs these checks on pushes and pull requests. It uploads browser traces and screenshots for 14 days. Regressions cover offline draft recovery, ambiguous saves, scheduling isolation, rotating questions, use-once member questions, reminder images and mobile layout. CI contains no expected-failure annotations.
 
 ## Group covers and email photos
 
@@ -54,3 +54,5 @@ See [deployment and operations](docs/DEPLOYMENT.md). Copy `wrangler.example.json
 - `scripts/`: encrypted backup and isolated recovery tools.
 - `tests/`, `e2e/`: isolated backend and browser verification.
 - `docs/`: review, repair acceptance criteria, and synthetic visual evidence.
+
+Group settings control the number of rotating bank questions (one by default), question reminder timing (24 hours before questions close), and submission reminder timing (24 hours before delivery). Questions close seven days before delivery. Member questions enter the queue automatically and are included once; each issue has at most ten questions. Hosts can upload a separate image for submission reminders. Members can opt out of each email type independently.

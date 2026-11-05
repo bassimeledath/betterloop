@@ -8,13 +8,14 @@ Account + creation allowance"];
  memberships [label="memberships
 Role + active flag + email preferences"];
  groups [label="groups
-Schedule + current cover"];
+Schedule + question policy
+Current cover + reminder image"];
  questions [label="questions
-Suggestions + selected set"];
+Pending member queue + used marker"];
  issues [label="issues
 Times + state + saved reminder policy"];
  iq [label="issue_questions
-Question copy for one issue"];
+Question copy + bank identity"];
  contributions [label="contributions
 Private draft + submitted copy + revision"];
  publications [label="publications

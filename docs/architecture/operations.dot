@@ -8,6 +8,8 @@ rankdir=TB;
 One bounded state transition"];
  signup [label="Signup
 Advance one pending enrollment"];
+ questions [label="Questions
+Queue reminders before question cutoff"];
  mail [label="Mail
 Claim at most two queued messages"];
  exports [label="Exports
@@ -16,8 +18,9 @@ Advance bounded archive work"];
 Expire records + remove unused objects"];
  health [label="D1 service_state
 Record each stage result"];
- tick -> schedule -> signup -> mail -> exports -> cleanup;
+ tick -> schedule -> signup -> questions -> mail -> exports -> cleanup;
  schedule -> health [style=dashed]; signup -> health [style=dashed];
+ questions -> health [style=dashed];
  mail -> health [style=dashed]; exports -> health [style=dashed]; cleanup -> health [style=dashed];
  note [label="A failed stage does not stop later stages",shape=note];
  health -> note [style=dashed];

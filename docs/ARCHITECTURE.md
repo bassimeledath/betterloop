@@ -1,9 +1,9 @@
 # Betterloop architecture and supported flows
 
 Document ID: BL-ARCH-001  
-Revision: 1  
-Date: 2026-11-04  
-Source baseline: `5ecfb589490c9654a14c10a50f06f5bee025107e`
+Revision: 2  
+Date: 2026-11-05  
+Source baseline: `7de3fbbe07b7f83d60543bb4eae1081693404b1a`
 
 ## 1. Purpose and document rules
 
@@ -119,13 +119,21 @@ The session cookie is Secure and HttpOnly in production. The session lasts thirt
 
 The creator supplies a name, description, timezone, and recurrence. The API checks the creation allowance and total group limit. It creates the group and owner membership together.
 
-The initial question set contains three starter questions. Members can add questions to the group collection. Owners and administrators select and order up to ten questions.
+Each issue receives one rotating bank question by default. The host can select zero to five bank questions. The bank has twenty-four questions with stable identifiers.
 
-The collection holds at most two hundred questions. Selected questions remain selected until the host changes them. The application does not select random questions or rotate a question bank automatically.
+The selector uses questions with the oldest use first. Unused questions come first. Thus, the bank does not repeat until all bank questions have been used.
 
-A new issue receives copies of the selected questions and author names. Later changes to the collection do not change that issue. Members can suggest questions before the next issue.
+Members can add their own questions. New member questions enter the queue automatically. The host can remove a question from the queue or select it again.
 
-An automatic issue needs at least one selected question. A group without selected questions shows a blocked state. It does not prevent other groups from advancing.
+Each issue has at most ten questions. Bank questions take the first places. Member questions fill the remaining places in queue order.
+
+A database batch copies the questions and marks included member questions as used. Used member questions do not carry forward. Extra member questions stay queued.
+
+The pending collection holds at most two hundred member questions. Open issues keep their question copies. Existing drafts and answer identifiers do not change.
+
+Questions close seven days before delivery, when the answer window opens. Late member questions wait for a later issue. A manual opening uses the current queue immediately.
+
+An automatic issue needs a bank question or an eligible member question. A group without either does not block other groups.
 
 ## 6. Write, save, submit, and edit again
 
@@ -184,7 +192,7 @@ Only one scheduled, open, or closing issue can exist per group. A group pause ca
 
 ### 7.2 Reminder policy
 
-The host can configure zero to three reminder offsets. Each offset is a distinct whole number from one to 168 hours before the deadline. The default is forty-eight hours.
+The host can configure zero to three reminder offsets. Each offset is a distinct whole number from one to 168 hours before the deadline. The default is twenty-four hours.
 
 New issues copy the policy. Group policy changes affect future issues. Extending an active issue recalculates its remaining reminder schedule from that issue's saved policy.
 
@@ -193,6 +201,14 @@ Each reminder slot has a unique outbox identity. After downtime, the scheduler q
 A reminder targets active members without a submitted copy. The sender checks submission, preferences, address eligibility, deadline, and membership again before sending. A submitted member receives no reminder.
 
 A withdrawn member can receive remaining future reminders. Completed reminder slots do not reopen. A short manually opened issue can receive one catch-up reminder before its deadline.
+
+The host can configure a separate image for submission reminders. The image uses the private cover storage and crop controls. Email includes it as an inline attachment.
+
+A separate email asks members to contribute questions. Its default timing is twenty-four hours before questions close. The host can change this offset or disable it.
+
+Members have a separate preference for question emails. Members with a queued question receive no question reminder. The sender checks the schedule and queue again before sending.
+
+Question reminders have one outbox identity per member and question deadline. They expire when questions close. Schedule changes invalidate queued reminders for the previous window.
 
 ### 7.3 Publication and delivery
 
@@ -229,11 +245,11 @@ HEIC files are not supported. Text and photo captions together have a ten KB lim
 
 The owner or administrator can upload, crop, describe, save, replace, or remove a cover. The editor creates a 1200 by 600 JPEG. The server permits at most 192 KiB.
 
-D1 holds cover bytes. The group points to its current cover. A publication records the cover identity and description used at publication time.
+D1 holds cover bytes. The group points to its current cover and separate reminder image. A publication records the cover identity and description used at publication time.
 
 A later cover replacement does not change an earlier letter. Editing a saved crop permits further cropping. Restoring the original framing requires another upload of the original file.
 
-Unreferenced replaced covers become eligible for cleanup after seven days. Cover storage has an application limit of sixty-four MiB. Compact email image storage has a separate limit of 250 MiB.
+Unreferenced replaced covers become eligible for cleanup after seven days. Cover and reminder image storage share an application limit of sixty-four MiB. Compact email image storage has a separate limit of 250 MiB.
 
 ### 8.3 Email images and preview
 
@@ -271,7 +287,7 @@ Group deletion pauses the group, closes access, cancels pending issues, and skip
 
 ### 9.2 Profile, preferences, sessions, and email changes
 
-A member can change the profile name. Each membership has separate preferences for opening, reminder, and publication email. Disabling a preference does not remove web access.
+A member can change the profile name. Each membership has separate preferences for opening, submission reminder, question reminder, and publication email. Disabling a preference does not remove web access.
 
 The account screen lists active sessions. The member can revoke one session or other sessions. Logout removes the current session and local recovery copies.
 
@@ -287,7 +303,7 @@ Account deletion requires confirmation with the current email address. An owner 
 
 Cron runs schedule, signup, mail, exports, and cleanup in that order. Each stage has an independent error boundary. A failed cleanup stage does not stop that tick's earlier email work.
 
-The scheduler advances one bounded task per call. Its priority is closure, opening, opening notice, reminder, then planning. Other groups can wait for a later tick.
+The scheduler advances one bounded task per call. Its priority is closure, opening, opening notice, submission reminder, then planning. A separate stage queues question reminders for eligible groups. Other groups can wait for a later tick.
 
 Each stage records status and time in `service_state`. Operator screens show delivery failures, queue age, and backup summaries. These records need an operator to inspect them.
 
@@ -345,6 +361,7 @@ The repository has isolated backend and browser tests. Test fixtures use fiction
 | Sign-in, access, revisions, submission rules | `tests/api.test.ts`, `tests/review-flows.test.ts` |
 | Publication and repeated scheduled work | `tests/lifecycle.test.ts`, `tests/replay-lifecycle.test.ts` |
 | Calendar, timezone, and recurrence | `tests/schedule.test.ts` |
+| Question rotation, use-once member questions, and cutoff | `tests/question-cycles.test.ts`, `tests/question-migration.test.mjs` |
 | Reminders, isolation, and independent stages | `tests/repair-policy.test.ts`, `tests/operations.test.ts` |
 | Image bounds and private access | `tests/photos.test.ts`, `tests/cover-email.test.ts` |
 | Email escaping, attachments, and HTML size | `tests/mail.test.ts`, `tests/cover-email.test.ts` |
@@ -354,7 +371,7 @@ The repository has isolated backend and browser tests. Test fixtures use fiction
 
 CI installs the pinned Node version and runs format checks, type checks, backend tests, a production build, and browser tests. It retains browser evidence for fourteen days.
 
-The source baseline has eighty-eight backend cases and ten browser cases. These counts describe that baseline. They do not replace inspection of the current CI result.
+The source baseline has ninety-four backend cases and eleven browser cases. These counts describe that baseline. They do not replace inspection of the current CI result.
 
 ## 13. Limits and extension points
 
@@ -363,7 +380,7 @@ The source baseline has eighty-eight backend cases and ten browser cases. These 
 | Five groups and twenty members per group | Keep the pilot bounded. measure before increasing these values. |
 | Two email claims per tick | Delivery spreads across ticks. increase only after capacity measurements. |
 | One bounded scheduler task per call | Simultaneous deadlines can delay later groups. |
-| No automatic question rotation | The host selects the next question set from member suggestions and starter questions. |
+| Question limits | Each issue has at most ten questions. The bank contributes zero to five questions. Pending member questions fill the remaining places. |
 | No comments or reactions | Readers use another channel for discussion. |
 | No events or shared album screen | Contribution photos remain part of letters. |
 | Weekly backups depend on a Mac | A cloud runner needs a separate schedule and credential design. |
@@ -405,4 +422,4 @@ Keep shared policy in the existing modules when adding a flow. Use explicit stat
 - [Cover and email photos](EMAIL_PHOTOS.md): image limits, privacy, and preview behavior.
 - [Public source repository](https://github.com/bassimeledath/betterloop): code and CI history.
 
-Update this document when a supported flow, role, state, storage location, or limit changes. Keep diagrams and text consistent. The editable diagram sources are in `docs/architecture/*.dot`.
+Update this document when a supported flow, role, state, storage location, or limit changes. Keep diagrams and text consistent. Question policy and reminder regression tests are in `tests/question-cycles.test.ts` and `tests/question-migration.test.mjs`. The editable diagram sources are in `docs/architecture/*.dot`.
