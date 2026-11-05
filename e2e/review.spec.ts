@@ -9,6 +9,9 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { harness, type TestClient } from "../tests/harness";
 import { runScheduler } from "../server/scheduler";
 import { processOutbox } from "../server/mail";
+const evidenceRoot = process.env.UPDATE_REVIEW_EVIDENCE
+  ? "docs/evidence"
+  : "test-results/review-evidence";
 const origin = "http://127.0.0.1:5193";
 type H = Awaited<ReturnType<typeof harness>>;
 const test = base.extend<{ h: H }>({
@@ -207,8 +210,8 @@ test("two sample submissions: resize, persist, edit, publish and display private
     .first<{ html: string }>();
   expect(mail!.html).toContain("2 private photos");
   expect(mail!.html).not.toContain("<img");
-  await mkdir("docs/evidence", { recursive: true });
-  await writeFile("docs/evidence/sample-newsletter.html", mail!.html);
+  await mkdir(evidenceRoot, { recursive: true });
+  await writeFile(evidenceRoot + "/sample-newsletter.html", mail!.html);
   const photoRows = await h.db
     .prepare(
       "SELECT width,height,bytes FROM assets WHERE issue_id=? ORDER BY created_at",
@@ -216,7 +219,7 @@ test("two sample submissions: resize, persist, edit, publish and display private
     .bind(issue.id)
     .all();
   await writeFile(
-    "docs/evidence/sample-result.json",
+    evidenceRoot + "/sample-result.json",
     JSON.stringify(
       {
         contributors: 2,
@@ -234,17 +237,17 @@ test("two sample submissions: resize, persist, edit, publish and display private
   const emailPage = await page.context().newPage();
   await emailPage.setContent(mail!.html);
   await emailPage.screenshot({
-    path: "docs/evidence/mobile-email.png",
+    path: evidenceRoot + "/mobile-email.png",
     fullPage: true,
   });
   await emailPage.close();
   await page
     .locator("main")
-    .screenshot({ path: "docs/evidence/mobile-reader.png" });
+    .screenshot({ path: evidenceRoot + "/mobile-reader.png" });
   await page.setViewportSize({ width: 1280, height: 900 });
   await page
     .locator("main")
-    .screenshot({ path: "docs/evidence/desktop-reader.png" });
+    .screenshot({ path: evidenceRoot + "/desktop-reader.png" });
   await info.attach("sample-publication", {
     body: JSON.stringify({
       contributors: 2,
@@ -321,10 +324,10 @@ test("mobile and desktop composition and settings have no page overflow or autom
     expect(results.violations).toEqual([]);
   }
   await page.setViewportSize({ width: 390, height: 844 });
-  await mkdir("docs/evidence", { recursive: true });
+  await mkdir(evidenceRoot, { recursive: true });
   await page
     .locator("main")
-    .screenshot({ path: "docs/evidence/mobile-composer.png" });
+    .screenshot({ path: evidenceRoot + "/mobile-composer.png" });
   await page.goto(`/groups/${gid}/settings`);
   await expect(
     page.getByRole("heading", { name: "A rhythm that feels right." }),
@@ -332,7 +335,7 @@ test("mobile and desktop composition and settings have no page overflow or autom
   await expect(page.getByText(/Next future letter:/)).toBeVisible();
   await page
     .locator("main")
-    .screenshot({ path: "docs/evidence/mobile-settings.png" });
+    .screenshot({ path: evidenceRoot + "/mobile-settings.png" });
   for (const width of [320, 390, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     expect(
@@ -461,9 +464,9 @@ test("a photo larger than one MiB is compressed before the upload request", asyn
     .first<{ width: number; height: number; bytes: number }>();
   expect(row!.width).toBe(1600);
   expect(row!.bytes).toBeLessThanOrEqual(1048576);
-  await mkdir("docs/evidence", { recursive: true });
+  await mkdir(evidenceRoot, { recursive: true });
   await writeFile(
-    "docs/evidence/large-upload-result.json",
+    evidenceRoot + "/large-upload-result.json",
     JSON.stringify({ inputBytes: input.length, ...row }, null, 2) + "\n",
   );
 });
@@ -482,14 +485,14 @@ test("R6: an allowed long group name fits a narrow mobile heading", async ({
   await expect(
     page.getByRole("heading", { name: "W".repeat(80), exact: true }),
   ).toBeVisible();
-  await mkdir("docs/evidence", { recursive: true });
-  await page.screenshot({ path: "docs/evidence/mobile-long-name.png" });
+  await mkdir(evidenceRoot, { recursive: true });
+  await page.screenshot({ path: evidenceRoot + "/mobile-long-name.png" });
   const width = await page.evaluate(() => ({
     page: document.documentElement.scrollWidth,
     viewport: innerWidth,
   }));
   await writeFile(
-    "docs/evidence/long-name-result.json",
+    evidenceRoot + "/long-name-result.json",
     JSON.stringify(width, null, 2) + "\n",
   );
   expect(width.page).toBeLessThanOrEqual(width.viewport);
