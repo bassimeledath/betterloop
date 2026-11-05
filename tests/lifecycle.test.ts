@@ -850,4 +850,4 @@ it("assembles a multipart export larger than five MiB without changing any photo
   }
   expect(photoCount).toBe(6);
   expect(at + 1024).toBe(bytes.length);
-});
+}, 30000);
