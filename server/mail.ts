@@ -32,36 +32,45 @@ export function publicationMail(
     (n, c) => n + c.update.photos.length,
     0,
   );
-  const photoHtml = p.contributors
-    .filter((c) => c.update.photos.length)
-    .map(
-      (c) =>
-        "<h3>" +
-        escapeHtml(c.name) +
-        "</h3>" +
-        c.update.photos
-          .map(
-            (photo) =>
-              '<div style="margin:16px 0">' +
-              (images[photo.id]
-                ? '<img width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:8px" src="' +
-                  escapeHtml(images[photo.id]) +
-                  '" alt="' +
-                  escapeHtml(photo.caption || "Photo from " + c.name) +
-                  '">'
-                : '<a href="' +
-                  escapeHtml(url) +
-                  '">View photo on Betterloop</a>') +
-              (photo.caption
-                ? '<p style="white-space:pre-line;font-size:14px;color:#65596b">' +
-                  escapeHtml(photo.caption) +
-                  "</p>"
-                : "") +
-              "</div>",
-          )
-          .join(""),
-    )
-    .join("");
+  const photoMarkup = (limit: number) =>
+    p.contributors
+      .filter((c) => c.update.photos.length)
+      .map(
+        (c) =>
+          "<h3>" +
+          escapeHtml(c.name) +
+          "</h3>" +
+          c.update.photos
+            .map(
+              (photo) =>
+                '<div style="margin:16px 0">' +
+                (images[photo.id]
+                  ? '<img width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:8px" src="' +
+                    escapeHtml(images[photo.id]) +
+                    '" alt="' +
+                    escapeHtml(
+                      photo.caption
+                        ? photo.caption.slice(0, limit)
+                        : "Photo from " + c.name,
+                    ) +
+                    '">'
+                  : '<a href="' +
+                    escapeHtml(url) +
+                    '">View photo on Betterloop</a>') +
+                (photo.caption
+                  ? '<p style="white-space:pre-line;font-size:14px;color:#65596b">' +
+                    escapeHtml(
+                      photo.caption.slice(0, limit) +
+                        (photo.caption.length > limit ? "…" : ""),
+                    ) +
+                    "</p>"
+                  : "") +
+                "</div>",
+            )
+            .join(""),
+      )
+      .join("");
+  const photoHtml = photoMarkup(250);
   const coverHtml =
     p.coverId && images[p.coverId]
       ? '<img width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:8px" src="' +
@@ -203,7 +212,7 @@ export function publicationMail(
                 ]
                   .filter(Boolean)
                   .join(" · ")
-                  .slice(0, 300),
+                  .slice(0, 100),
               ) +
               "</p></section>",
           )
@@ -211,7 +220,7 @@ export function publicationMail(
         "<p>📸 " +
         photoCount +
         " private photos</p>" +
-        photoHtml +
+        photoMarkup(40) +
         '<a href="' +
         escapeHtml(url) +
         '">Read your letter</a><p><a href="' +
