@@ -327,6 +327,7 @@ test("mobile and desktop composition and settings have no page overflow or autom
   await expect(
     page.getByRole("heading", { name: "A rhythm that feels right." }),
   ).toBeVisible();
+  await expect(page.getByText(/Next future letter:/)).toBeVisible();
   await page
     .locator("main")
     .screenshot({ path: "docs/evidence/mobile-settings.png" });
@@ -456,13 +457,11 @@ test("a photo larger than one MiB is compressed before the upload request", asyn
   });
   const input = Buffer.from(url.split(",")[1], "base64");
   expect(input.length).toBeGreaterThan(1048576);
-  await page
-    .getByLabel("Add a photo")
-    .setInputFiles({
-      name: "large-noise.png",
-      mimeType: "image/png",
-      buffer: input,
-    });
+  await page.getByLabel("Add a photo").setInputFiles({
+    name: "large-noise.png",
+    mimeType: "image/png",
+    buffer: input,
+  });
   await expect(page.locator("figure img")).toHaveCount(1);
   await saved(page);
   const row = await h.db
