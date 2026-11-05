@@ -19,6 +19,7 @@ export interface Env {
       subject: string;
       html: string;
       text: string;
+      attachments?: import("./email-images").InlineImage[];
     }): Promise<{ messageId: string }>;
   };
 }

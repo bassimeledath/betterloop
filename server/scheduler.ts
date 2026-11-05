@@ -150,10 +150,15 @@ async function plan(env: Env, stamp: number) {
 }
 async function publish(env: Env, issue: Issue, stamp: number) {
   const g = await env.DB.prepare(
-    "SELECT name,deleted_at FROM groups WHERE id=?",
+    "SELECT g.name,g.deleted_at,g.cover_id,c.caption AS cover_caption FROM groups g LEFT JOIN group_covers c ON c.id=g.cover_id WHERE g.id=?",
   )
     .bind(issue.group_id)
-    .first<{ name: string; deleted_at: number | null }>();
+    .first<{
+      name: string;
+      deleted_at: number | null;
+      cover_id: string | null;
+      cover_caption: string | null;
+    }>();
   if (!g || g.deleted_at) {
     await env.DB.prepare(
       "UPDATE issues SET state='cancelled' WHERE id=? AND state='closing'",
@@ -192,6 +197,8 @@ async function publish(env: Env, issue: Issue, stamp: number) {
   const content: Publication = {
     schemaVersion: 1,
     groupName: g.name,
+    coverId: g.cover_id,
+    coverCaption: g.cover_caption || "",
     title: issue.title,
     questions,
     contributors: people.map((p) => ({

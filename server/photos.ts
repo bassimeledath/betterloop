@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import type { App, Env, Issue, Publication, Update } from "./types";
 import { id, now, member, fail, rate } from "./security";
 import { redactPublication } from "./privacy";
@@ -115,10 +115,29 @@ photos.post("/groups/:groupId/issues/:issueId/assets", async (c) => {
   if (!i) fail(409, "Photo uploads close at the issue deadline.");
   if (!c.env.PHOTOS)
     fail(503, "The host needs to configure private photo storage.");
-  if (c.req.header("Content-Type") !== "image/jpeg")
-    fail(400, "Choose a photo that can be converted to JPEG.");
   await rate(c.env, "photo:" + user, 12, 3600000);
-  const raw = new Uint8Array(await c.req.arrayBuffer());
+  let raw: Uint8Array,
+    emailData: ArrayBuffer | null = null;
+  if (c.req.header("Content-Type")?.startsWith("multipart/form-data")) {
+    const form = await c.req.formData(),
+      full = form.get("photo"),
+      small = form.get("emailPhoto");
+    if (!(full instanceof File) || !(small instanceof File))
+      fail(400, "Choose a photo.");
+    raw = new Uint8Array(await full.arrayBuffer());
+    const bytes = new Uint8Array(await small.arrayBuffer());
+    if (bytes.length > 98304) fail(413, "Email photo is too large.");
+    try {
+      const image = cleanJpeg(bytes);
+      if (image.width > 800 || image.height > 800)
+        fail(400, "Resize the email photo to 800 pixels.");
+      emailData = image.bytes.buffer as ArrayBuffer;
+    } catch {
+      fail(400, "Invalid email photo.");
+    }
+  } else if (c.req.header("Content-Type") === "image/jpeg")
+    raw = new Uint8Array(await c.req.arrayBuffer());
+  else fail(400, "Choose a photo that can be converted to JPEG.");
   if (raw.byteLength > 1048576) fail(413, "Keep each photo under 1 MB.");
   let image;
   let ready = false;
@@ -178,6 +197,12 @@ photos.post("/groups/:groupId/issues/:issueId/assets", async (c) => {
       409,
       "This issue closed or your group access changed while the photo uploaded.",
     );
+  if (emailData)
+    await c.env.DB.prepare(
+      "UPDATE assets SET email_data=? WHERE id=? AND state='ready' AND (SELECT COALESCE(SUM(length(email_data)),0) FROM assets)+?<=262144000",
+    )
+      .bind(emailData, aid, emailData.byteLength)
+      .run();
   return c.json(
     {
       id: aid,
@@ -188,9 +213,9 @@ photos.post("/groups/:groupId/issues/:issueId/assets", async (c) => {
     201,
   );
 });
-photos.get("/assets/:id", async (c) => {
+async function servePhoto(c: Context<App>) {
   const a = await c.env.DB.prepare(
-    "SELECT * FROM assets WHERE id=? AND state='ready'",
+    "SELECT group_id,issue_id,user_id,object_key FROM assets WHERE id=? AND state='ready'",
   )
     .bind(c.req.param("id"))
     .first<{
@@ -217,12 +242,28 @@ photos.get("/assets/:id", async (c) => {
     )
       fail(404, "Photo not found.");
   }
+  if (c.req.path.endsWith("/email")) {
+    const compact = await c.env.DB.prepare(
+      "SELECT email_data FROM assets WHERE id=?",
+    )
+      .bind(c.req.param("id"))
+      .first<{ email_data: number[] | null }>();
+    if (compact?.email_data)
+      return new Response(new Uint8Array(compact.email_data), {
+        headers: {
+          "Content-Type": "image/jpeg",
+          "Cache-Control": "private, no-store",
+        },
+      });
+  }
   const object = await c.env.PHOTOS?.get(a.object_key);
   if (!object) fail(404, "Photo not found.");
   c.header("Cache-Control", "private, no-store");
   c.header("Content-Type", "image/jpeg");
   return new Response(object.body, { headers: c.res.headers });
-});
+}
+photos.get("/assets/:id", servePhoto);
+photos.get("/assets/:id/email", servePhoto);
 photos.delete("/assets/:id", async (c) => {
   const aid = c.req.param("id"),
     user = c.get("session").user.id;

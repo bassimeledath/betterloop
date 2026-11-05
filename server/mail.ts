@@ -1,3 +1,4 @@
+import { emailImages, type InlineImage } from "./email-images";
 import type { Env, Publication } from "./types";
 import { decrypt, id, now } from "./security";
 import { redactPublication } from "./privacy";
@@ -22,20 +23,64 @@ export const escapeHtml = (s: string) =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
-export function publicationMail(p: Publication, url: string) {
+export function publicationMail(
+  p: Publication,
+  url: string,
+  images: Record<string, string> = {},
+) {
   const photoCount = p.contributors.reduce(
     (n, c) => n + c.update.photos.length,
     0,
   );
+  const photoHtml = p.contributors
+    .filter((c) => c.update.photos.length)
+    .map(
+      (c) =>
+        "<h3>" +
+        escapeHtml(c.name) +
+        "</h3>" +
+        c.update.photos
+          .map(
+            (photo) =>
+              '<div style="margin:16px 0">' +
+              (images[photo.id]
+                ? '<img width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:8px" src="' +
+                  escapeHtml(images[photo.id]) +
+                  '" alt="' +
+                  escapeHtml(photo.caption || "Photo from " + c.name) +
+                  '">'
+                : '<a href="' +
+                  escapeHtml(url) +
+                  '">View photo on Betterloop</a>') +
+              (photo.caption
+                ? '<p style="white-space:pre-line;font-size:14px;color:#65596b">' +
+                  escapeHtml(photo.caption) +
+                  "</p>"
+                : "") +
+              "</div>",
+          )
+          .join(""),
+    )
+    .join("");
+  const coverHtml =
+    p.coverId && images[p.coverId]
+      ? '<img width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:8px" src="' +
+        escapeHtml(images[p.coverId]) +
+        '" alt="' +
+        escapeHtml(p.coverCaption || p.groupName + " group photo") +
+        '">'
+      : "";
   const plain = [
     p.groupName,
     p.title,
-    ...p.questions.flatMap((q) => [
-      q.author_name + " asked: " + q.text,
-      ...p.contributors
-        .filter((a) => a.update.answers[q.id])
-        .map((a) => a.name + ": " + a.update.answers[q.id].slice(0, 1800)),
-    ]),
+    ...p.questions
+      .filter((q) => p.contributors.some((c) => c.update.answers[q.id]))
+      .flatMap((q) => [
+        q.author_name + " asked: " + q.text,
+        ...p.contributors
+          .filter((a) => a.update.answers[q.id])
+          .map((a) => a.name + ": " + a.update.answers[q.id].slice(0, 1800)),
+      ]),
     "Photo Wall: " +
       photoCount +
       " private " +
@@ -67,12 +112,15 @@ export function publicationMail(p: Publication, url: string) {
   if (excerptLength > 80000) return summary();
   // The bounded excerpts include each contributor even when the full issue is long.
   const html =
-    '<div style="background:#f2edf6;padding:24px;font-family:Arial,sans-serif;color:#302536"><div style="background:#fffefd;max-width:620px;margin:auto;padding:24px"><h1 style="font-family:Georgia,serif">' +
+    '<div style="background:#f2edf6;padding:24px;font-family:Arial,sans-serif;color:#302536"><div style="background:#fffefd;max-width:620px;margin:auto;padding:24px">' +
+    coverHtml +
+    '<h1 style="font-family:Georgia,serif">' +
     escapeHtml(p.groupName) +
     "</h1><p>" +
     escapeHtml(p.title) +
     "</p><hr>" +
     p.questions
+      .filter((q) => p.contributors.some((c) => c.update.answers[q.id]))
       .map(
         (q) =>
           '<section style="background:#f5f1f7;padding:16px;margin:20px 0"><h2 style="font-family:Georgia,serif">' +
@@ -101,11 +149,15 @@ export function publicationMail(p: Publication, url: string) {
     ' · <a href="' +
     escapeHtml(url) +
     '">View on Betterloop</a></p>' +
+    photoHtml +
     ["shoutout", "good"]
+      .filter((key) =>
+        p.contributors.some((c) => c.update[key as "shoutout" | "good"]),
+      )
       .map(
         (key, i) =>
           "<h2>" +
-          ["📣 Shout-outs", "🌤️ One Good Thing"][i] +
+          (key === "shoutout" ? "📣 Shout-outs" : "🌤️ One Good Thing") +
           "</h2>" +
           p.contributors
             .filter((a) => a.update[key as "good" | "shoutout"])
@@ -133,6 +185,7 @@ export function publicationMail(p: Publication, url: string) {
     return {
       text: plain,
       html:
+        coverHtml +
         "<h1>" +
         escapeHtml(p.groupName) +
         "</h1><p>A taste of everyone’s update. Read the complete letter and private photos on Betterloop.</p>" +
@@ -157,7 +210,9 @@ export function publicationMail(p: Publication, url: string) {
           .join("") +
         "<p>📸 " +
         photoCount +
-        ' private photos</p><a href="' +
+        " private photos</p>" +
+        photoHtml +
+        '<a href="' +
         escapeHtml(url) +
         '">Read your letter</a><p><a href="' +
         escapeHtml(url.replace(/\/issues\/[^/]+$/, "/preferences")) +
@@ -303,6 +358,7 @@ export async function processOutbox(env: Env, limit = 2) {
       await set("failed", "mail_not_configured");
       continue;
     }
+    let attachments: InlineImage[] = [];
     let subject = "",
       html = "",
       text = "";
@@ -356,10 +412,13 @@ export async function processOutbox(env: Env, limit = 2) {
           await set("skipped", "publication_missing");
           continue;
         }
-        const m = publicationMail(
-          await redactPublication(env, JSON.parse(r.content_json)),
-          url,
+        const publication = await redactPublication(
+          env,
+          JSON.parse(r.content_json),
         );
+        const images = await emailImages(env, o.group_id!, publication);
+        const m = publicationMail(publication, url, images.sources);
+        attachments = images.attachments;
         subject = "Betterloop · " + groupName + ": your little letter is here";
         html = m.html;
         text = m.text;
@@ -437,6 +496,7 @@ export async function processOutbox(env: Env, limit = 2) {
             subject,
             html,
             text,
+            ...(attachments.length ? { attachments } : {}),
           })
         ).messageId;
       }

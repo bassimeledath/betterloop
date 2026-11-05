@@ -13,6 +13,8 @@ export interface Session {
   tokenHash: string;
 }
 export interface Group {
+  cover_id?: string | null;
+  cover_caption?: string;
   selected_questions?: number;
   reminder_offsets_json?: string;
   id: string;
@@ -68,6 +70,8 @@ export interface Update {
   good: string;
 }
 export interface Publication {
+  coverId?: string | null;
+  coverCaption?: string;
   schemaVersion: 1;
   groupName: string;
   title: string;

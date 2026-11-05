@@ -216,6 +216,7 @@ function IssuePage({
         View my saved draft
       </Button>
       <Reader
+        gid={gid}
         p={data.publication}
         date={data.issue.delivery_at}
         zone={data.issue.timezone}

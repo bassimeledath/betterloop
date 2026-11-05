@@ -1,4 +1,7 @@
-export async function preparePhoto(file: File): Promise<Blob> {
+export async function preparePhoto(
+  file: File,
+  options: { maxPixels?: number; maxBytes?: number } = {},
+): Promise<Blob> {
   if (file.size > 20 * 1024 * 1024)
     throw new Error("Choose a photo smaller than 20 MB.");
   if (
@@ -14,7 +17,10 @@ export async function preparePhoto(file: File): Promise<Blob> {
       "This photo format could not be opened. Try a JPEG or PNG copy.",
     );
   }
-  const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
+  const scale = Math.min(
+    1,
+    (options.maxPixels || 1600) / Math.max(image.width, image.height),
+  );
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(image.width * scale));
   canvas.height = Math.max(1, Math.round(image.height * scale));
@@ -38,9 +44,9 @@ export async function preparePhoto(file: File): Promise<Blob> {
         quality,
       ),
     );
-  for (const quality of [0.85, 0.7, 0.5]) {
+  for (const quality of [0.85, 0.7, 0.5, 0.35, 0.2, 0.12, 0.08]) {
     const blob = await encode(quality);
-    if (blob.size <= 1048576) return blob;
+    if (blob.size <= (options.maxBytes || 1048576)) return blob;
   }
   throw new Error(
     "This photo is still too large after resizing. Try a smaller copy.",

@@ -3,6 +3,11 @@ import { redactPublication } from "./privacy";
 import { cleanupExports } from "./exports";
 const DAY = 86400000;
 export async function runCleanup(env: Env, stamp = Date.now()) {
+  await env.DB.prepare(
+    "DELETE FROM group_covers WHERE created_at<? AND NOT EXISTS(SELECT 1 FROM groups WHERE cover_id=group_covers.id) AND NOT EXISTS(SELECT 1 FROM publications WHERE group_id=group_covers.group_id AND json_extract(content_json,'$.coverId')=group_covers.id)",
+  )
+    .bind(stamp - 7 * DAY)
+    .run();
   await env.DB.batch([
     env.DB.prepare(
       "DELETE FROM join_signups WHERE expires_at<? OR joined_at<?",

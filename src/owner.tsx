@@ -1,3 +1,5 @@
+import { CoverEditor } from "./cover";
+import { EmailPreview } from "./email-preview";
 import React, { useEffect, useState } from "react";
 import { api } from "./api";
 import { PageHeading, Button, ErrorMessage, useData, when, go } from "./ui";
@@ -314,6 +316,7 @@ export function GroupSettingsScreen({ gid }: { gid: string }) {
       </form>
       {host && (
         <>
+          <CoverEditor group={data.group} reload={refresh} />
           <ScheduleEditor
             key={data.group.revision}
             data={data}
@@ -326,6 +329,7 @@ export function GroupSettingsScreen({ gid }: { gid: string }) {
               return d;
             }}
           />
+          {active && <EmailPreview gid={gid} iid={active.id} />}
           {active && (
             <form className="panel" onSubmit={extend}>
               <h2 className="panel-title">The current issue</h2>

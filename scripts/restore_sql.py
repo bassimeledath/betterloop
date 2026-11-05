@@ -21,8 +21,27 @@ while remaining:
     remaining.difference_update(ready)
 
 ddl = [statement for statement in statements if statement.startswith('CREATE TABLE')]
-inserts = [statement for name in ordered for statement in statements
-           if statement.startswith('INSERT INTO "' + name + '"')]
+def identifier(name):
+    return '"' + name.replace('"', '""') + '"'
+
+inserts = []
+for name in ordered:
+    columns = [row[1] for row in connection.execute('PRAGMA table_info(' + identifier(name) + ')')]
+    for row in connection.execute('SELECT rowid,* FROM ' + identifier(name)):
+        rid, values = row[0], row[1:]
+        literals, large = [], []
+        for column, value in zip(columns, values):
+            if isinstance(value, bytes) and len(value) > 12000:
+                literals.append('zeroblob(' + str(len(value)) + ')')
+                large.append((column, value))
+            else:
+                literals.append(connection.execute('SELECT quote(?)', (value,)).fetchone()[0])
+        inserts.append('INSERT INTO ' + identifier(name) + '(rowid,' + ','.join(map(identifier, columns)) + ') VALUES(' + str(rid) + ',' + ','.join(literals) + ');')
+        for column, value in large:
+            quoted = identifier(column)
+            for offset in range(0, len(value), 12000):
+                chunk = value[offset:offset + 12000]
+                inserts.append('UPDATE ' + identifier(name) + ' SET ' + quoted + '=CAST(substr(' + quoted + ',1,' + str(offset) + ")||X'" + chunk.hex() + "'||substr(" + quoted + ',' + str(offset + len(chunk) + 1) + ') AS BLOB) WHERE rowid=' + str(rid) + ';')
 other = [statement for statement in statements
          if statement.startswith(('CREATE INDEX', 'CREATE UNIQUE INDEX', 'CREATE TRIGGER'))]
 with open(sys.argv[2], 'w') as output:

@@ -209,7 +209,8 @@ test("two sample submissions: resize, persist, edit, publish and display private
     .bind(owner.email)
     .first<{ html: string }>();
   expect(mail!.html).toContain("2 private photos");
-  expect(mail!.html).not.toContain("<img");
+  expect(mail!.html).toContain("<img");
+  expect(mail!.html).toContain("cid:");
   await mkdir(evidenceRoot, { recursive: true });
   await writeFile(evidenceRoot + "/sample-newsletter.html", mail!.html);
   const photoRows = await h.db
@@ -235,7 +236,12 @@ test("two sample submissions: resize, persist, edit, publish and display private
     ) + "\n",
   );
   const emailPage = await page.context().newPage();
-  await emailPage.setContent(mail!.html);
+  await emailPage.goto(origin + path + "/email-preview");
+  await expect(emailPage.locator("img")).toHaveCount(2);
+  for (const img of await emailPage.locator("img").all())
+    await expect
+      .poll(() => img.evaluate((i: HTMLImageElement) => i.naturalWidth > 0))
+      .toBe(true);
   await emailPage.screenshot({
     path: evidenceRoot + "/mobile-email.png",
     fullPage: true,
@@ -518,4 +524,80 @@ test("a save rejected before commit can be retried without discarding text", asy
   await expect(page.locator("textarea").first()).toHaveValue(
     "Not yet committed",
   );
+});
+
+test("host crops and replaces a group cover and previews an email with its inline photos", async ({
+  page,
+  h,
+}) => {
+  const { gid, path, issue, owner } = await setup(page, h);
+  await page.locator("textarea").first().fill("A picnic with the gang.");
+  await saved(page);
+  await page
+    .getByLabel("Add a photo")
+    .setInputFiles(await photo(page, 3200, 1800, "image/jpeg"));
+  await expect(page.locator("figure img")).toHaveCount(1);
+  await page.getByLabel("Caption", { exact: true }).fill("The best picnic.");
+  await saved(page);
+  expect(
+    await h.db
+      .prepare("SELECT length(email_data) AS size FROM assets WHERE issue_id=?")
+      .bind(issue.id)
+      .first(),
+  ).toMatchObject({ size: expect.any(Number) });
+  await page.goto(`/groups/${gid}/settings`);
+  await page
+    .getByLabel("Choose a group cover", { exact: true })
+    .setInputFiles(await photo(page, 1600, 1000, "image/jpeg"));
+  await expect(page.getByLabel("Cover crop preview")).toBeVisible();
+  await page.getByLabel("Zoom", { exact: true }).focus();
+  await page.getByLabel("Zoom", { exact: true }).press("ArrowRight");
+  await page
+    .getByLabel("Cover description", { exact: true })
+    .fill("Friends at the park");
+  await page
+    .getByRole("button", { name: "Save group cover", exact: true })
+    .click();
+  await expect(
+    page.getByText("Cover saved. It will appear in your next letter."),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Preview newsletter email", exact: true })
+    .click();
+  const frame = page.frameLocator('iframe[title="Newsletter email preview"]');
+  await expect(frame.getByText("A picnic with the gang.")).toBeVisible();
+  await expect(frame.locator("img")).toHaveCount(2);
+  for (const img of await frame.locator("img").all())
+    await expect
+      .poll(() =>
+        img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0),
+      )
+      .toBe(true);
+  await mkdir(evidenceRoot, { recursive: true });
+  await page.screenshot({
+    path: evidenceRoot + "/mobile-cover-controls.png",
+    fullPage: true,
+  });
+  const preview = await page.context().newPage();
+  await preview.goto(
+    origin + `/api/groups/${gid}/issues/${issue.id}/email-preview`,
+  );
+  await preview.screenshot({
+    path: evidenceRoot + "/mobile-photo-email.png",
+    fullPage: true,
+  });
+  await preview.close();
+  await page
+    .getByLabel("Choose a group cover", { exact: true })
+    .setInputFiles(await photo(page, 1800, 1200, "image/png"));
+  await page
+    .getByRole("button", { name: "Save group cover", exact: true })
+    .click();
+  await expect(
+    page.getByText("Cover saved. It will appear in your next letter."),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Remove current cover", exact: true })
+    .click();
+  await expect(page.getByText("Current cover removed.")).toBeVisible();
 });

@@ -41,16 +41,24 @@ export function Home({ me }: { me: Me }) {
       <div className="group-grid">
         {data?.groups.map((g) => (
           <article className="group-card" key={g.id}>
-            <div
-              className="collage"
-              role="img"
-              aria-label="Group cover illustration"
-            >
-              <span aria-hidden="true">✳</span>
-              <span aria-hidden="true">✦</span>
-              <span aria-hidden="true">☕</span>
-              <span aria-hidden="true">✳</span>
-            </div>
+            {g.cover_id ? (
+              <img
+                className="group-cover"
+                src={"/api/groups/" + g.id + "/covers/" + g.cover_id}
+                alt={g.name + " group cover"}
+              />
+            ) : (
+              <div
+                className="collage"
+                role="img"
+                aria-label="Group cover illustration"
+              >
+                <span aria-hidden="true">✳</span>
+                <span aria-hidden="true">✦</span>
+                <span aria-hidden="true">☕</span>
+                <span aria-hidden="true">✳</span>
+              </div>
+            )}
             <h2>{g.name}</h2>
             <p className="small center">
               {g.member_count} {g.member_count === 1 ? "person" : "people"} ·{" "}
@@ -244,6 +252,13 @@ export function GroupHome({ gid }: { gid: string }) {
     <>
       <span className="kicker">YOUR LITTLE CORNER OF THE WORLD</span>
       <PageHeading>{g.name}</PageHeading>
+      {g.cover_id && (
+        <img
+          className="group-cover"
+          src={"/api/groups/" + g.id + "/covers/" + g.cover_id}
+          alt={g.cover_caption || g.name + " group cover"}
+        />
+      )}
       {g.selected_questions === 0 && (
         <p className="notice">
           The next issue is waiting for a question. Ask an administrator to

@@ -1,3 +1,4 @@
+import { getCover, base64 } from "./covers";
 import { Hono, type Context } from "hono";
 import { z } from "zod";
 import type { App, Env, Publication, Update } from "./types";
@@ -129,7 +130,7 @@ async function create(
         format: "betterloop-export-v1",
         kind: "group",
         group: await env.DB.prepare(
-          "SELECT id,name,description,timezone,cadence FROM groups WHERE id=?",
+          "SELECT id,name,description,timezone,cadence,cover_id FROM groups WHERE id=?",
         )
           .bind(groupId)
           .first(),
@@ -172,6 +173,29 @@ async function create(
       "INSERT INTO export_files(job_id,path,payload_json,bytes) SELECT id,?,?,? FROM exports WHERE id=?",
     ).bind("manifest.json", json, encoder.encode(json).byteLength, jid),
   ];
+  if (groupId && "group" in meta && meta.group) {
+    const cid = (meta.group as { cover_id?: string | null }).cover_id;
+    if (cid) {
+      const cover = await getCover(env, groupId, cid);
+      if (!cover) fail(409, "The group cover changed. Retry the export.");
+      const payload = JSON.stringify({
+        id: cover.id,
+        caption: cover.caption,
+        contentType: "image/jpeg",
+        base64: base64(new Uint8Array(cover.data)),
+      });
+      statements.push(
+        env.DB.prepare(
+          "INSERT INTO export_files(job_id,path,payload_json,bytes) SELECT id,?,?,? FROM exports WHERE id=?",
+        ).bind(
+          "covers/" + cid + ".json",
+          payload,
+          encoder.encode(payload).length,
+          jid,
+        ),
+      );
+    }
+  }
   if (!groupId)
     statements.push(
       env.DB.prepare(
@@ -337,6 +361,27 @@ async function planStep(env: Env, j: Job, lease: string) {
           encoder.encode(json).byteLength,
         )
         .run();
+      if (content.coverId) {
+        const cover = await getCover(env, j.group_id!, content.coverId);
+        if (cover) {
+          const payload = JSON.stringify({
+            id: cover.id,
+            caption: cover.caption,
+            contentType: "image/jpeg",
+            base64: base64(new Uint8Array(cover.data)),
+          });
+          await env.DB.prepare(
+            "INSERT OR IGNORE INTO export_files(job_id,path,payload_json,bytes) VALUES(?,?,?,?)",
+          )
+            .bind(
+              j.id,
+              "covers/" + cover.id + ".json",
+              payload,
+              encoder.encode(payload).length,
+            )
+            .run();
+        }
+      }
       await addAssets(
         env,
         j,

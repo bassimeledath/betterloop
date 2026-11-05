@@ -1,3 +1,5 @@
+import { covers } from "./covers";
+import { emailPreview } from "./email-preview";
 import { operatorRoutes } from "./operator";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -33,12 +35,13 @@ app.use("*", async (c, next) => {
   c.header("X-Request-ID", c.get("requestId"));
   c.header("X-Content-Type-Options", "nosniff");
   c.header("Referrer-Policy", "no-referrer");
-  c.header("X-Frame-Options", "DENY");
+  c.header("X-Frame-Options", c.res.headers.get("X-Frame-Options") || "DENY");
   c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   if (c.req.path.startsWith("/api/")) c.header("Cache-Control", "no-store");
   c.header(
     "Content-Security-Policy",
-    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    c.res.headers.get("Content-Security-Policy") ||
+      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
   );
   await recordRequest(c, started);
 });
@@ -100,6 +103,8 @@ app.get("/api/me", (c) =>
 app.route("/api/groups", groups);
 app.route("/api/groups", issues);
 app.route("/api", photos);
+app.route("/api", covers);
+app.route("/api", emailPreview);
 app.patch("/api/me", async (c) => {
   const b = z
     .object({ name: z.string().trim().min(1).max(80) })

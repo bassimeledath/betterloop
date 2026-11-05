@@ -5,10 +5,12 @@ export function Reader({
   p,
   date,
   zone,
+  gid,
 }: {
   p: Publication;
   date: number;
   zone: string;
+  gid: string;
 }) {
   const [person, setPerson] = useState("");
   const contributors = person
@@ -18,9 +20,17 @@ export function Reader({
     <article className="letter">
       <div className="masthead">
         <span className="kicker">A LETTER FROM YOUR PEOPLE</span>
-        <div className="banner" aria-hidden="true">
-          ✳　✦　✳
-        </div>
+        {p.coverId ? (
+          <img
+            className="group-cover"
+            src={"/api/groups/" + gid + "/covers/" + p.coverId}
+            alt={p.coverCaption || p.groupName + " group cover"}
+          />
+        ) : (
+          <div className="banner" aria-hidden="true">
+            ✳　✦　✳
+          </div>
+        )}
         <PageHeading>{p.groupName}</PageHeading>
         <p>
           {p.title} ·{" "}

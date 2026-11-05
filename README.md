@@ -33,6 +33,10 @@ Vitest executes Worker routes against isolated workerd/D1/R2 bindings. Playwrigh
 
 CI runs these checks on pushes and pull requests. It uploads browser traces and screenshots for 14 days. Regressions cover offline draft recovery, ambiguous saves, scheduling isolation, reminders and mobile layout. CI contains no expected-failure annotations.
 
+## Group covers and email photos
+
+See [cover editing and email previews](docs/EMAIL_PHOTOS.md). Images are inline email attachments; web photos remain private.
+
 ## Deployment
 
 See [deployment and operations](docs/DEPLOYMENT.md). Copy `wrangler.example.jsonc` to the ignored `wrangler.jsonc` and supply your own resources. Outbound email is disabled in the template. No production credentials, group data, invitation links, private backups, or prior operational history are included.

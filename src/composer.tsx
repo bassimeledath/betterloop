@@ -1,3 +1,4 @@
+import { EmailPreview } from "./email-preview";
 import React, { useState, useEffect, useRef } from "react";
 import { Lock } from "lucide-react";
 import { api, ApiError, uploadPhoto } from "./api";
@@ -92,7 +93,11 @@ export function Composer({
       if (live.current.update.photos.length >= 3)
         throw new Error("You can add up to three photos.");
       const blob = await preparePhoto(file);
-      const asset = await uploadPhoto(path + "/assets", blob);
+      const emailPhoto = await preparePhoto(file, {
+        maxPixels: 800,
+        maxBytes: 98304,
+      });
+      const asset = await uploadPhoto(path + "/assets", blob, emailPhoto);
       change({
         ...live.current.update,
         photos: [...live.current.update.photos, { id: asset.id, caption: "" }],
@@ -324,6 +329,9 @@ export function Composer({
           </Button>
         </div>
       )}
+      {review && !dirty && !busy && (
+        <EmailPreview gid={gid} iid={data.issue.id} />
+      )}
       <div className="panel">
         <h2>✨ Questions</h2>
         <p className="small">Answers and photo captions share a 10 KB limit.</p>
@@ -352,7 +360,7 @@ export function Composer({
         {busy && <p className="small">Preparing or saving your update…</p>}
         <p className="small">
           Up to three photos, resized privately before uploading. Location
-          metadata is stripped.
+          metadata is stripped. Email copies can be saved or forwarded.
         </p>
         <div className="photos">
           {update.photos.map((photo) => (

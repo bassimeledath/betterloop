@@ -34,7 +34,7 @@ const creation = settings.extend({ requestId: z.uuid().optional() });
 const seedQuestions = [
   "What has been a small bright spot lately?",
   "What are you looking forward to?",
-  "A recommendation for the table?",
+  "What’s something you’d love us to do together?",
 ];
 groups.get("/", async (c) => {
   const rows = await c.env.DB.prepare(
@@ -113,7 +113,7 @@ groups.get("/:groupId", async (c) => {
   const gid = c.req.param("groupId"),
     m = await member(c, gid);
   const g = await c.env.DB.prepare(
-    "SELECT g.*,(SELECT COUNT(*) FROM questions q WHERE q.group_id=g.id AND q.selected=1) AS selected_questions FROM groups g WHERE g.id=?",
+    "SELECT g.*,(SELECT caption FROM group_covers WHERE id=g.cover_id) AS cover_caption,(SELECT COUNT(*) FROM questions q WHERE q.group_id=g.id AND q.selected=1) AS selected_questions FROM groups g WHERE g.id=?",
   )
     .bind(gid)
     .first<Group>();
