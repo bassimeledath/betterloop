@@ -1,0 +1,33 @@
+digraph architecture {
+graph [bgcolor="#fffefd",pad="0.25",nodesep="0.35",ranksep="0.5",fontname="Arial"];
+node [shape=box,style="rounded,filled",fillcolor="#f2edf6",color="#b5a0c0",fontname="Arial",fontsize=12,margin="0.16,0.12",fontcolor="#302536"];
+edge [fontname="Arial",fontsize=10,color="#71507e",fontcolor="#65596b",arrowsize=0.7];
+rankdir=TB;
+ browser [label="Browser
+React screens + photo preparation"];
+ local [label="Local recovery
+Text + photo references"];
+ worker [label="One Cloudflare Worker
+Static assets + Hono API"];
+ db [label="D1
+Records + outbox + small images",shape=cylinder];
+ r2 [label="Private R2
+Photos + temporary exports",shape=cylinder];
+ cron [label="Cron trigger
+Every minute"];
+ email [label="Cloudflare email
+Recipient verification + sending"];
+ inbox [label="Member inbox"];
+ mac [label="Mac backup runner
+Weekly when available"];
+ backup [label="Private backup R2
+Encrypted archive",shape=cylinder];
+ browser -> worker [label="HTTPS + session"];
+ browser -> local [label="Unsaved edits",dir=both];
+ worker -> db [label="SQL"]; worker -> r2 [label="Private objects"];
+ cron -> worker [label="Bounded stages"];
+ worker -> email [label="Enrollment / outbox"]; email -> inbox;
+ db -> mac [label="Export"]; r2 -> mac [label="Referenced photos"];
+ mac -> backup [label="Encrypted copy"];
+ 
+}

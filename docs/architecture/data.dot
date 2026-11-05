@@ -1,0 +1,33 @@
+digraph architecture {
+graph [bgcolor="#fffefd",pad="0.25",nodesep="0.35",ranksep="0.5",fontname="Arial"];
+node [shape=box,style="rounded,filled",fillcolor="#f2edf6",color="#b5a0c0",fontname="Arial",fontsize=12,margin="0.16,0.12",fontcolor="#302536"];
+edge [fontname="Arial",fontsize=10,color="#71507e",fontcolor="#65596b",arrowsize=0.7];
+rankdir=TB;
+ users [label="users
+Account + creation allowance"];
+ memberships [label="memberships
+Role + active flag + email preferences"];
+ groups [label="groups
+Schedule + current cover"];
+ questions [label="questions
+Suggestions + selected set"];
+ issues [label="issues
+Times + state + saved reminder policy"];
+ iq [label="issue_questions
+Question copy for one issue"];
+ contributions [label="contributions
+Private draft + submitted copy + revision"];
+ publications [label="publications
+Published content + cover identity"];
+ assets [label="assets
+Private object key + email image bytes"];
+ outbox [label="email_outbox
+Unique logical key + delivery state"];
+ users -> memberships [label="1 : many"]; groups -> memberships [label="1 : many"];
+ groups -> questions [label="1 : many"]; groups -> issues [label="1 : many"];
+ issues -> iq [label="1 : many"]; issues -> contributions [label="1 : many"];
+ users -> contributions [label="1 : many"]; issues -> publications [label="1 : 0..1"];
+ contributions -> assets [label="Photo ID references"];
+ issues -> outbox [label="1 : many"];
+ 
+}

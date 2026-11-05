@@ -4,6 +4,10 @@ Private group newsletters for friends, built with React, Hono, Cloudflare Worker
 
 **Start with [the repair notes](docs/REPAIRS.md).** The original [code review](docs/CODE_REVIEW.md) is retained as historical context. Its four defect reproductions now run as ordinary passing regressions.
 
+## Architecture
+
+See [architecture and supported flows](docs/ARCHITECTURE.md) for component boundaries, data ownership, user flows, and failure behavior. The [standalone HTML edition](docs/ARCHITECTURE.html) includes all seven diagrams and works offline.
+
 ## Local development
 
 Use Node 22.19.0 (`nvm use`) and Python 3 for backup/restore tests.

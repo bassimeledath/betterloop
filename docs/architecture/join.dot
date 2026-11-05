@@ -1,0 +1,28 @@
+digraph architecture {
+graph [bgcolor="#fffefd",pad="0.25",nodesep="0.35",ranksep="0.5",fontname="Arial"];
+node [shape=box,style="rounded,filled",fillcolor="#f2edf6",color="#b5a0c0",fontname="Arial",fontsize=12,margin="0.16,0.12",fontcolor="#302536"];
+edge [fontname="Arial",fontsize=10,color="#71507e",fontcolor="#65596b",arrowsize=0.7];
+rankdir=TB;
+ link [label="Friend opens shared group link"];
+ form [label="Enter name and email"];
+ check [label="Check link, capacity,
+rate limits and blocked membership"];
+ verify [label="Cloudflare recipient verification
+Friend confirms address"];
+ login [label="Queue Betterloop sign-in email
+Link expires after 15 minutes"];
+ confirm [label="Friend opens link
+and confirms sign-in"];
+ batch [label="D1 batch
+Claim token + create session
++ activate membership if eligible"];
+ home [label="Open group
+No host approval needed"];
+ reject [label="Closed link / full group / expired token
+Explain next step; do not join"];
+ link -> form -> check; check -> verify [label="Eligible new address"];
+ check -> login [label="Address already verified"];
+ verify -> login -> confirm -> batch -> home;
+ check -> reject [label="Not eligible"]; batch -> reject [label="Join eligibility changed"];
+ 
+}

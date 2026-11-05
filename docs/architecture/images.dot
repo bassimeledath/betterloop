@@ -1,0 +1,35 @@
+digraph architecture {
+graph [bgcolor="#fffefd",pad="0.25",nodesep="0.35",ranksep="0.5",fontname="Arial"];
+node [shape=box,style="rounded,filled",fillcolor="#f2edf6",color="#b5a0c0",fontname="Arial",fontsize=12,margin="0.16,0.12",fontcolor="#302536"];
+edge [fontname="Arial",fontsize=10,color="#71507e",fontcolor="#65596b",arrowsize=0.7];
+rankdir=TB;
+ file [label="Device file
+JPEG / PNG / WebP, at most 20 MiB"];
+ prep [label="Browser preparation
+Resize + flatten + JPEG"];
+ api [label="Upload API
+Membership + issue + size checks
+Strip metadata"];
+ r2 [label="Private R2
+Prepared contribution photo
+At most 1600 px / 1 MiB",shape=cylinder];
+ db [label="D1 asset record
+Email copy: 800 px / 96 KiB",shape=cylinder];
+ cover [label="Cover crop editor
+1200 x 600 JPEG / 192 KiB"];
+ covers [label="D1 group_covers
+Current pointer + published references",shape=cylinder];
+ email [label="Email image selection
+Cover first; then contribution photos
+32 attachments / 12 MiB raw bytes"];
+ cid [label="CID inline email attachments
+Remaining photos: caption + web link"];
+ web [label="Authenticated web image
+Own draft or published group photo"];
+ file -> prep -> api; api -> r2; api -> db;
+ file -> cover -> covers;
+ r2 -> web; covers -> web;
+ db -> email; covers -> email; r2 -> email [label="Legacy fallback"];
+ email -> cid;
+ 
+}
