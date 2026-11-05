@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "betterloop-local",
+  "main": "server/index.ts",
+  "compatibility_date": "2026-08-06",
+  "vars": {
+    "ENVIRONMENT": "local",
+    "EMAIL_MODE": "capture",
+    "OPERATOR_EMAIL": "host@example.test",
+    "APP_ORIGIN": "http://127.0.0.1:5173",
+    "OUTBOX_KEY": "local-only-32-byte-encryption-key!",
+    "CF_ACCOUNT_ID": "00000000000000000000000000000000",
+    "CF_EMAIL_TOKEN": "local-email-enrollment",
+  },
+  "services": [
+    { "binding": "EMAIL_ROUTING_API", "service": "betterloop-email-local" },
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "little-letters-local",
+      "database_id": "local-db",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "r2_buckets": [
+    { "binding": "PHOTOS", "bucket_name": "little-letters-local" },
+  ],
+}

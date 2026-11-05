@@ -1,0 +1,50 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "betterloop",
+  "main": "server/index.ts",
+  "compatibility_date": "2026-08-06",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"],
+  },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "EMAIL_MODE": "disabled",
+    "OPERATOR_EMAIL": "host@example.com",
+    "APP_ORIGIN": "https://betterloop.example.com",
+    "EMAIL_FROM": "hello@betterloop.example.com",
+    "CF_ACCOUNT_ID": "REPLACE_ACCOUNT_ID",
+  },
+  "triggers": {
+    "crons": ["* * * * *"],
+  },
+  "observability": {
+    "enabled": true,
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "betterloop",
+      "database_id": "REPLACE_DATABASE_ID",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "PHOTOS",
+      "bucket_name": "betterloop-private",
+    },
+    {
+      "binding": "BACKUPS",
+      "bucket_name": "betterloop-backups",
+    },
+  ],
+  "workers_dev": false,
+  "preview_urls": false,
+  "send_email": [
+    {
+      "name": "EMAIL",
+    },
+  ],
+}

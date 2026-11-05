@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars*
+.env*
+coverage/
+test-results/
+playwright-report/
+work/
+*.log
+
+wrangler.jsonc
+ops/*.plist
+*.blbackup
+backup-key*
+.DS_Store
