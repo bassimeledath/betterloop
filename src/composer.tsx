@@ -237,6 +237,32 @@ export function Composer({
             : "You have private draft changes. Submit changes to replace your previous submission before the deadline."}
         </p>
       )}
+      {data.contribution?.submitted && (
+        <details className="panel">
+          <summary>View the submitted copy</summary>
+          {data.questions.map((q) => (
+            <div key={q.id}>
+              <strong>{q.text}</strong>
+              <p className="answer">
+                {data.contribution!.submitted!.answers[q.id] || "No answer"}
+              </p>
+            </div>
+          ))}
+          <p className="answer">{data.contribution.submitted.shoutout}</p>
+          <p className="answer">{data.contribution.submitted.good}</p>
+          <div className="photos">
+            {data.contribution.submitted.photos.map((p) => (
+              <figure key={p.id}>
+                <img
+                  src={"/api/assets/" + p.id}
+                  alt={p.caption || "Submitted photo"}
+                />
+                <figcaption>{p.caption}</figcaption>
+              </figure>
+            ))}
+          </div>
+        </details>
+      )}
       <div className="row spread">
         <span className="tag">
           <Lock size={12} /> Only you can see this draft

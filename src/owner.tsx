@@ -339,8 +339,10 @@ export function GroupSettingsScreen({ gid }: { gid: string }) {
                 {active.reminder_at < active.deadline &&
                 !(active as typeof active & { reminded_at?: number })
                   .reminded_at
-                  ? "Next reminder: " +
-                    when(active.reminder_at, data.group.timezone)
+                  ? active.reminder_at <= Date.now()
+                    ? "A reminder is waiting to send."
+                    : "Next reminder: " +
+                      when(active.reminder_at, data.group.timezone)
                   : "No further reminders for this issue."}
               </p>
               <label>
