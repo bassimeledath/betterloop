@@ -259,7 +259,7 @@ export function GroupHome({ gid }: { gid: string }) {
           alt={g.cover_caption || g.name + " group cover"}
         />
       )}
-      {g.selected_questions === 0 && (
+      {g.selected_questions === 0 && !g.bank_question_count && (
         <p className="notice">
           The next issue is waiting for a question. Ask an administrator to
           select at least one in Questions.
@@ -354,7 +354,7 @@ export function GroupHome({ gid }: { gid: string }) {
           </label>
           <ErrorMessage error={failure} />
           <button className="button secondary" disabled={opening}>
-            {opening ? "Opening…" : "Open with selected questions"}
+            {opening ? "Opening…" : "Open next letter"}
           </button>
         </form>
       )}
@@ -415,9 +415,11 @@ function Archive({ gid, zone }: { gid: string; zone: string }) {
   );
 }
 export function Questions({ gid }: { gid: string }) {
-  const { data, error, refresh } = useData<{ questions: Q[] }>(
-      "/groups/" + gid + "/questions",
-    ),
+  const { data, error, refresh } = useData<{
+      questions: Q[];
+      questionDeadline: number;
+      bankCount: number;
+    }>("/groups/" + gid + "/questions"),
     detail = useData<Detail>("/groups/" + gid),
     [text, setText] = useState(""),
     [failure, setFailure] = useState("");
@@ -467,8 +469,20 @@ export function Questions({ gid }: { gid: string }) {
           />
         </label>
         <p className="small">
-          The host chooses questions for the next issue. Open issues keep their
-          existing questions.
+          Member questions join the next issue automatically, up to ten
+          questions total. The host can remove a question from the queue. Each
+          is used once; extra questions wait for a later issue. Open issues keep
+          their existing questions.
+          {data && detail.data && (
+            <>
+              {" "}
+              Add yours before{" "}
+              {when(data.questionDeadline, detail.data.group.timezone)}. This is
+              when the next answer window opens. Each issue also includes{" "}
+              {data.bankCount} rotating bank{" "}
+              {data.bankCount === 1 ? "question" : "questions"}.
+            </>
+          )}
         </p>
         <button className="button">Send to the question pile ✍️</button>
       </form>
@@ -479,7 +493,9 @@ export function Questions({ gid }: { gid: string }) {
               {q.text}
               <small>{q.author_name || "The group"}</small>
             </p>
-            {host ? (
+            {q.used_issue_id ? (
+              <span className="tag">Used in a past or current issue</span>
+            ) : host ? (
               <label className="checkbox">
                 <input
                   aria-label={"Use " + q.text}
@@ -487,7 +503,7 @@ export function Questions({ gid }: { gid: string }) {
                   checked={!!q.selected}
                   onChange={() => void select(q)}
                 />{" "}
-                Next issue
+                Queued for next issue
               </label>
             ) : (
               !!q.selected && <span className="tag">Next issue</span>

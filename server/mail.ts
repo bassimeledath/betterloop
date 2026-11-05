@@ -1,3 +1,5 @@
+import { getCover } from "./covers";
+import { questionDeadline } from "./question-reminders";
 import { emailImages, type InlineImage } from "./email-images";
 import type { Env, Publication } from "./types";
 import { decrypt, id, now } from "./security";
@@ -297,6 +299,8 @@ export async function processOutbox(env: Env, limit = 2) {
       continue;
     }
     let groupName = "Betterloop";
+    let questionDue: number | null = null;
+    let reminderImageId: string | null = null;
     let collection: {
       deadline: number;
       timezone: string;
@@ -304,7 +308,7 @@ export async function processOutbox(env: Env, limit = 2) {
     } | null = null;
     if (o.group_id) {
       const m = await env.DB.prepare(
-        "SELECT m.*,g.name,g.timezone,g.paused,g.deleted_at FROM memberships m JOIN groups g ON g.id=m.group_id WHERE m.user_id=? AND m.group_id=? AND m.active=1",
+        "SELECT m.*,g.name,g.timezone,g.paused,g.deleted_at,g.reminder_image_id FROM memberships m JOIN groups g ON g.id=m.group_id WHERE m.user_id=? AND m.group_id=? AND m.active=1",
       )
         .bind(o.user_id, o.group_id)
         .first<{
@@ -314,25 +318,60 @@ export async function processOutbox(env: Env, limit = 2) {
           deleted_at: number | null;
           notify_open: number;
           notify_reminder: number;
+          notify_questions: number;
+          reminder_image_id: string | null;
           notify_issue: number;
         }>();
       const pref =
         o.kind === "opening"
           ? "notify_open"
-          : o.kind === "reminder"
-            ? "notify_reminder"
-            : "notify_issue";
+          : o.kind === "question_reminder"
+            ? "notify_questions"
+            : o.kind === "reminder"
+              ? "notify_reminder"
+              : "notify_issue";
       if (
         !m ||
         m.deleted_at ||
         !m[pref] ||
-        (m.paused && ["opening", "reminder"].includes(o.kind))
+        (m.paused &&
+          ["opening", "reminder", "question_reminder"].includes(o.kind))
       ) {
         await set("skipped", "membership_or_preference");
         continue;
       }
       groupName = m.name;
-      if (o.issue_id && ["opening", "reminder"].includes(o.kind)) {
+      reminderImageId = o.kind === "reminder" ? m.reminder_image_id : null;
+      if (o.kind === "question_reminder") {
+        const group = await env.DB.prepare("SELECT * FROM groups WHERE id=?")
+          .bind(o.group_id)
+          .first<import("./types").Group>();
+        const offered = await env.DB.prepare(
+          "SELECT 1 FROM questions WHERE group_id=? AND author_id=? AND source='member' AND selected=1 AND used_issue_id IS NULL",
+        )
+          .bind(o.group_id, o.user_id)
+          .first();
+        if (
+          !group ||
+          !group.question_reminder_hours ||
+          offered ||
+          o.expires_at !== (await questionDeadline(group)) ||
+          o.expires_at - group.question_reminder_hours * 3600000 > now()
+        ) {
+          await set("skipped", "question_window_changed");
+          continue;
+        }
+        questionDue = o.expires_at;
+        collection = {
+          deadline: questionDue!,
+          timezone: m.timezone,
+          questions: [],
+        };
+      }
+      if (
+        o.issue_id &&
+        ["opening", "reminder", "question_reminder"].includes(o.kind)
+      ) {
         const issue = await env.DB.prepare(
           "SELECT i.id,i.deadline,(SELECT json_group_array(text) FROM (SELECT text FROM issue_questions WHERE issue_id=i.id AND group_id=i.group_id ORDER BY position)) AS questions_json FROM issues i WHERE i.id=? AND i.group_id=? AND i.state='open' AND i.deadline>?",
         )
@@ -431,6 +470,41 @@ export async function processOutbox(env: Env, limit = 2) {
         subject = "Betterloop · " + groupName + ": your little letter is here";
         html = m.html;
         text = m.text;
+      } else if (o.kind === "question_reminder") {
+        if (!collection || !questionDue)
+          throw new Error("question_context_missing");
+        const due =
+          new Intl.DateTimeFormat("en-US", {
+            dateStyle: "full",
+            timeStyle: "short",
+            timeZone: collection.timezone,
+          }).format(questionDue) +
+          " (" +
+          collection.timezone +
+          ")";
+        const questionUrl = origin + "/groups/" + o.group_id + "/questions";
+        const preferences = origin + "/groups/" + o.group_id + "/preferences";
+        subject =
+          "Betterloop · " + groupName + ": a question for the next letter?";
+        text =
+          "Got a question for " +
+          groupName +
+          "?\nAdd it before " +
+          due +
+          ". Questions close when the next answer window opens.\n" +
+          questionUrl +
+          "\nManage group emails: " +
+          preferences;
+        html =
+          "<h1>Ask something good.</h1><p>Got a question for " +
+          escapeHtml(groupName) +
+          "?</p><p>Add it before <strong>" +
+          escapeHtml(due) +
+          '</strong>. Questions close when the next answer window opens.</p><p><a href="' +
+          escapeHtml(questionUrl) +
+          '">Add your question</a></p><p><a href="' +
+          escapeHtml(preferences) +
+          '">Manage group emails</a></p>';
       } else {
         if (!collection) throw new Error("collection_context_missing");
         const deadline = new Intl.DateTimeFormat("en-US", {
@@ -475,6 +549,26 @@ export async function processOutbox(env: Env, limit = 2) {
           '">Write your update</a><p><a href="' +
           escapeHtml(preferences) +
           '">Manage group emails</a></p>';
+      }
+      if (reminderImageId) {
+        const image = await getCover(env, o.group_id!, reminderImageId);
+        if (image) {
+          const cid = image.id + "@betterloop";
+          attachments.push({
+            filename: image.id + ".jpg",
+            type: "image/jpeg",
+            disposition: "inline",
+            contentId: cid,
+            content: new Uint8Array(image.data).buffer,
+          });
+          html =
+            '<img width="560" style="display:block;width:100%;max-width:560px;height:auto" src="cid:' +
+            cid +
+            '" alt="' +
+            escapeHtml(image.caption || "A reminder from your group") +
+            '">' +
+            html;
+        }
       }
     } catch {
       await set("failed", "message_preparation_failed");

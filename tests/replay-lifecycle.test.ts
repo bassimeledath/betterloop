@@ -70,7 +70,7 @@ it("replays concurrent issue creation once, including after closure, without byp
       )
       .bind(gid, iid, iid)
       .first(),
-  ).toEqual({ issues: 1, questions: 3, events: 1 });
+  ).toEqual({ issues: 1, questions: 1, events: 1 });
   await h.db
     .prepare("UPDATE issues SET state='cancelled' WHERE id=?")
     .bind(iid)
@@ -383,7 +383,7 @@ it("extends an issue without publishing at the old deadline and schedules a fres
       .bind(issue.id)
       .first(),
   ).toEqual({ state: "open", deadline: extended });
-  await runScheduler(h.env, extended - 2 * DAY + 1);
+  await runScheduler(h.env, extended - DAY + 1);
   const reminders = await h.db
     .prepare(
       "SELECT state FROM email_outbox WHERE issue_id=? AND kind='reminder'",
@@ -485,7 +485,7 @@ it("fences a reminder selected before an extension and skips a stale job that re
   expect(
     await h.db.prepare("SELECT COUNT(*) AS n FROM captured_emails").first(),
   ).toEqual(before);
-  await runScheduler(h.env, extended - 2 * DAY + 1);
+  await runScheduler(h.env, extended - DAY + 1);
   expect(
     (
       await h.db

@@ -1,5 +1,6 @@
 import type { Env } from "./types";
 import { now } from "./security";
+import { enqueueQuestionReminders } from "./question-reminders";
 import { runScheduler } from "./scheduler";
 import { processOutbox } from "./mail";
 import { runExportStep } from "./exports";
@@ -37,6 +38,7 @@ export async function runCron(env: Env) {
     {
       schedule: () => runScheduler(env),
       signup: () => runSignupStep(env),
+      questions: () => enqueueQuestionReminders(env),
       mail: () => processOutbox(env),
       exports: () => runExportStep(env),
       cleanup: () => runCleanup(env),

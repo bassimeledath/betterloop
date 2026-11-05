@@ -325,7 +325,7 @@ it("creates one group, membership, starter set, and audit event for concurrent r
   expect(counts).toEqual({
     groups_count: 1,
     members_count: 1,
-    questions_count: 3,
+    questions_count: 0,
     audits_count: 1,
   });
   expect(

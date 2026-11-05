@@ -134,6 +134,8 @@ app.post("/api/dev/tick", async (c) => {
   await runExportStep(c.env);
   await runCleanup(c.env);
   await runSignupStep(c.env);
+  const { enqueueQuestionReminders } = await import("./question-reminders");
+  await enqueueQuestionReminders(c.env);
   await processOutbox(c.env, 20);
   return c.json({ ok: true });
 });
